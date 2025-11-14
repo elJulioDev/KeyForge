@@ -194,6 +194,15 @@ def toggle_app_focus():
     
     update_app_status()
 
+def on_app_selected(event):
+    """
+    Actualiza target_app_name cuando se selecciona una nueva ventana del combobox.
+    """
+    global target_app_name
+    if enforce_app_focus:
+        target_app_name = app_combo.get()
+        update_app_status()
+
 
 # --- Lógica del Script ---
 
@@ -459,6 +468,9 @@ app_select_frame.pack(fill="x", padx=10, pady=5)
 ttk.Label(app_select_frame, text="Programa:", width=12).pack(side="left")
 app_combo = ttk.Combobox(app_select_frame, state="readonly", width=40)
 app_combo.pack(side="left", padx=5)
+app_combo.bind("<<ComboboxSelected>>", on_app_selected)
+
+app_combo.bind("<<ComboboxSelected>>", on_app_selected)
 
 btn_refresh = ttk.Button(
     app_select_frame,
