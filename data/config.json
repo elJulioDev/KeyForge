@@ -3,5 +3,6 @@
     "key_to_replace": "alt",
     "replacement_key": "shift",
     "enforce_app_focus": true,
-    "target_app_name": "KeyForge.pyw - programacion - Visual Studio Code"
+    "target_app_name": "",
+    "lang": "en"
 }

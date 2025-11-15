@@ -7,7 +7,20 @@ from pathlib import Path
 # --- Configuración de Rutas ---
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
+LANG_FILE = DATA_DIR / "lang.json"
 CONFIG_FILE = DATA_DIR / "config.json"
+
+# Carga configuración
+with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+# Carga idiomas
+with open(LANG_FILE, 'r', encoding='utf-8') as f:
+    translations = json.load(f)
+
+# Lee el idioma elegido (ejemplo: 'es' o 'en')
+lang = config.get("lang", "es")
+# Selecciona las traducciones
+tr = translations.get(lang, translations['es'])
 
 # Crear carpeta data si no existe
 DATA_DIR.mkdir(exist_ok=True)
@@ -57,37 +70,42 @@ def load_config():
         print(f"❌ Error al cargar configuración: {e}")
         return DEFAULT_CONFIG.copy()
 
-
-
 def save_config():
     """
-    Guarda la configuración actual en el archivo JSON.
+    Guarda la configuración actual en el archivo JSON pero preservando otras claves (como 'lang').
     """
     try:
-        config = {
+        # 1. Leer la config actual (o iniciar con DEFAULT)
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                current_config = json.load(f)
+        else:
+            current_config = {}
+
+        # 2. Actualizar/configurar solo los campos editables
+        current_config.update({
             "mode": mode_var.get(),
             "key_to_replace": replace_key_var.get(),
             "replacement_key": replacement_key_var.get(),
             "enforce_app_focus": app_focus_var.get(),
             "target_app_name": app_combo.get() if app_focus_var.get() else ""
-        }
-        
+        })
+
+        # 3. Guardar TODO el config (no sólo lo nuevo)
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-        
+            json.dump(current_config, f, indent=4, ensure_ascii=False)
+
         messagebox.showinfo(
-            "Configuración Guardada",
-            f"✅ Configuración guardada exitosamente en:\n{CONFIG_FILE}"
+            tr["saved_title"],
+            tr["saved_msg"].format(config_file=CONFIG_FILE)
         )
-        print(f"💾 Configuración guardada: {config}")
-        
+        print(tr["saved_msg"].format(config_file=CONFIG_FILE))
     except Exception as e:
         messagebox.showerror(
-            "Error",
-            f"❌ No se pudo guardar la configuración:\n{str(e)}"
+            tr["error_title"],
+            tr["error_msg"].format(err=str(e))
         )
-        print(f"❌ Error al guardar configuración: {e}")
-
+        print(tr["error_msg"].format(err=e))
 
 
 def apply_config(config):
@@ -107,11 +125,7 @@ def apply_config(config):
         except:
             pass
 
-
-
 # --- Lógica de Verificación ---
-
-
 
 def is_target_app_active():
     """
@@ -129,8 +143,6 @@ def is_target_app_active():
         pass
     return False
 
-
-
 def update_app_status():
     """
     Actualiza la etiqueta de estado y la variable de caché.
@@ -139,24 +151,26 @@ def update_app_status():
     global target_app_is_active
     
     if not enforce_app_focus:
-        app_status_label.config(text="🌐 Modo Global (Todos los programas)", bootstyle="info")
+        app_status_label.config(
+            text=tr["global_mode"],  # 🌐 Modo Global (Todos los programas)
+            bootstyle="info"
+        )
         target_app_is_active = True
     else:
         if is_target_app_active():
             app_status_label.config(
-                text=f"✅ {target_app_name} Detectado", 
+                text=tr["app_detected"].format(app=target_app_name),  # ✅ {app} Detectado
                 bootstyle="success"
             )
             target_app_is_active = True
         else:
             app_status_label.config(
-                text=f"❌ Esperando {target_app_name}...", 
+                text=tr["waiting_app"].format(app=target_app_name),   # ❌ Esperando {app}...
                 bootstyle="info"
             )
             target_app_is_active = False
     
     root.after(500, update_app_status)
-
 
 
 def refresh_windows_list():
@@ -177,8 +191,7 @@ def refresh_windows_list():
         if unique_windows and not app_combo.get():
             app_combo.set(unique_windows[0])
     except Exception as e:
-        app_combo['values'] = ["Error al obtener ventanas"]
-
+        app_combo['values'] = [tr["refresh_error"]]
 
 
 def toggle_app_focus():
@@ -255,8 +268,8 @@ def toggle_script():
             keyboard.release(replacement_key)
             toggle_state_active = False
             
-        status_label.config(text="🔴 Script detenido", bootstyle="danger") 
-        toggle_btn.config(text="▶ Activar Script", bootstyle="success")
+        status_label.config(text=tr["status_stopped"], bootstyle="danger") 
+        toggle_btn.config(text=tr["activate_script_btn"], bootstyle="success")
         
         # Reactivar los controles
         radio_mantener.config(state="normal")
@@ -281,13 +294,17 @@ def toggle_script():
         
         key_hook = keyboard.hook(handle_key_event, suppress=True)
         
-        mode_text = "Mantener" if current_mode == "mantener" else "Intercalar"
+        mode_text = tr["hold"] if current_mode == "mantener" else tr["toggle"]
         status_label.config(
-            text=f"🟢 Activo: {key_to_replace} → {replacement_key} ({mode_text})", 
+            text=tr["status_running"].format(
+                src=key_to_replace,
+                dst=replacement_key,
+                mode=mode_text
+            ), 
             bootstyle="success"
         )
         
-        toggle_btn.config(text="⏸ Detener Script", bootstyle="warning")
+        toggle_btn.config(text=tr["stop_script_btn"], bootstyle="warning")
         
         # Desactivar controles mientras está activo
         radio_mantener.config(state="disabled")
@@ -313,7 +330,7 @@ def listen_for_key(target_var, target_label):
     
     is_listening = True
     original_text = target_label.cget("text")
-    target_label.config(text="⌨️ Presiona una tecla...")
+    target_label.config(text=tr["press_key_label"])
     
     def capture():
         global is_listening
@@ -715,7 +732,7 @@ status_frame.pack(fill="x", padx=20, pady=(0, 10))
 
 status_label = ttk.Label(
     status_frame, 
-    text="🔴 Script detenido", 
+    text=tr["status_stopped"],
     bootstyle="danger", 
     font=("-size", 11, "-weight", "bold")
 ) 
@@ -723,7 +740,7 @@ status_label.pack()
 
 app_status_label = ttk.Label(
     status_frame, 
-    text="❌ Esperando configuración...", 
+    text=tr["waiting_config"], 
     bootstyle="info",
     font=("-size", 8)
 )
@@ -731,13 +748,13 @@ app_status_label.pack(pady=(3, 0))
 
 # -------------- SECCIÓN: APLICACIÓN OBJETIVO -------------
 
-app_frame = ttk.LabelFrame(root, text="  🎯 Aplicación Objetivo  ", padding=12)
+app_frame = ttk.LabelFrame(root, text=tr["target_app_title"], padding=12)
 app_frame.pack(padx=20, pady=(0, 10), fill="x")
 
 # Checkbox toggle compacto
 check_app_focus = ttk.Checkbutton(
     app_frame,
-    text="Mantener enfoque en programa específico",
+    text=tr["focus_checkbox"], 
     variable=app_focus_var,
     command=toggle_app_focus,
     bootstyle="round-toggle"
@@ -750,7 +767,7 @@ app_select_container.pack(fill="x")
 
 ttk.Label(
     app_select_container, 
-    text="Programa:", 
+    text=tr["program_label"],  
     font=("-size", 9, "-weight", "bold")
 ).grid(row=0, column=0, sticky="w", pady=4)
 
@@ -776,7 +793,7 @@ app_select_container.columnconfigure(1, weight=1)
 # Info reducida
 info_label = ttk.Label(
     app_frame,
-    text="💡 Desactiva para funcionar en todos los programas",
+    text=tr["focus_info"],
     font=("-size", 8),
     bootstyle="secondary"
 )
@@ -784,7 +801,7 @@ info_label.pack(pady=(6, 0))
 
 # ---------- SECCIÓN: CONFIGURACIÓN DE TECLAS --------------
 
-config_frame = ttk.LabelFrame(root, text="  ⚙️ Configuración de Teclas  ", padding=12)
+config_frame = ttk.LabelFrame(root, text=tr["key_config_title"], padding=12)
 config_frame.pack(padx=20, pady=(0, 10), fill="x")
 
 # Grid para teclas compacto
@@ -794,7 +811,7 @@ keys_grid.pack(fill="x")
 # Tecla a Reemplazar
 ttk.Label(
     keys_grid, 
-    text="Tecla a Remplazar:", 
+    text=tr["replace_label"],
     font=("-size", 9, "-weight", "bold")
 ).grid(row=0, column=0, sticky="w", pady=6)
 
@@ -811,7 +828,7 @@ replace_status.grid(row=0, column=2, padx=4, pady=6)
 
 btn_detect_replace = ttk.Button(
     keys_grid, 
-    text="Detectar",
+    text=tr["detect_btn"],
     command=lambda: listen_for_key(replace_key_var, replace_status),
     bootstyle="info-outline",
     width=10
@@ -821,7 +838,7 @@ btn_detect_replace.grid(row=0, column=3, pady=6)
 # Tecla de Reemplazo
 ttk.Label(
     keys_grid, 
-    text="Remplazar con:", 
+    text=tr["with_label"],
     font=("-size", 9, "-weight", "bold")
 ).grid(row=1, column=0, sticky="w", pady=6)
 
@@ -838,7 +855,7 @@ replacement_status.grid(row=1, column=2, padx=4, pady=6)
 
 btn_detect_replacement = ttk.Button(
     keys_grid, 
-    text="Detectar",
+    text=tr["detect_btn"],
     command=lambda: listen_for_key(replacement_key_var, replacement_status),
     bootstyle="info-outline",
     width=10
@@ -848,7 +865,7 @@ btn_detect_replacement.grid(row=1, column=3, pady=6)
 # Botón de ayuda compacto
 btn_show_keys = ttk.Button(
     config_frame,
-    text="📋 Ver Teclas Comunes",
+    text=tr["show_keys_btn"],
     command=show_common_keys,
     bootstyle="secondary-outline"
 )
@@ -856,12 +873,12 @@ btn_show_keys.pack(fill="x", pady=(10, 0))
 
 # ------------ SECCIÓN: MODO DE OPERACIÓN ---------------
 
-mode_frame = ttk.LabelFrame(root, text="  🎮 Modo de Operación  ", padding=12)
+mode_frame = ttk.LabelFrame(root, text=tr["mode_title"], padding=12)
 mode_frame.pack(padx=20, pady=(0, 10), fill="x")
 
 radio_mantener = ttk.Radiobutton(
     mode_frame, 
-    text="⏺ Mantener (Hold) - Presiona mientras sostienes la tecla", 
+    text=tr["hold_mode"],
     variable=mode_var, 
     value="mantener"
 )
@@ -869,7 +886,7 @@ radio_mantener.pack(anchor="w", pady=4)
 
 radio_intercalar = ttk.Radiobutton(
     mode_frame, 
-    text="🔄 Intercalar (Toggle) - Alterna entre activado/desactivado", 
+    text=tr["toggle_mode"], 
     variable=mode_var, 
     value="intercalar"
 )
@@ -883,7 +900,7 @@ controls_frame.pack(fill="x", padx=20, pady=(0, 10))
 # Botón activar/detener destacado
 toggle_btn = ttk.Button(
     controls_frame, 
-    text="▶ Activar Script", 
+    text=tr["activate_script_btn"],
     command=toggle_script, 
     bootstyle="success"
 )
@@ -895,7 +912,7 @@ secondary_btns.pack(fill="x")
 
 btn_save_config = ttk.Button(
     secondary_btns,
-    text="💾 Guardar",
+    text=tr["save_btn"],
     command=save_config,
     bootstyle="info"
 )
@@ -903,7 +920,7 @@ btn_save_config.pack(side="left", fill="x", expand=True, padx=(0, 4))
 
 btn_minimize_custom = ttk.Button(
     secondary_btns,
-    text="➖ Minimizar",
+    text=tr["minimize_btn"],
     command=minimize_custom,
     bootstyle="secondary"
 )
@@ -911,7 +928,7 @@ btn_minimize_custom.pack(side="left", fill="x", expand=True, padx=(4, 4))
 
 exit_btn = ttk.Button(
     secondary_btns, 
-    text="✕ Salir", 
+    text=tr["exit_btn"],
     command=on_close, 
     bootstyle="danger-outline"
 )
