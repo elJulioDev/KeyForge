@@ -336,15 +336,17 @@ def listen_for_key(target_var, target_label):
     thread.start()
 
 
-
 def show_common_keys():
-    """
-    Muestra una ventana con las teclas más comunes.
-    """
+    """Muestra una ventana con las teclas más comunes."""
     keys_window = ttk.Toplevel(root)
     keys_window.title("Teclas Disponibles")
     keys_window.geometry("520x450")
     keys_window.resizable(False, False)
+    
+    # CORRECCIÓN: Asegurar que la ventana aparezca encima
+    keys_window.attributes('-topmost', True)
+    keys_window.transient(root)  # Hacer que sea dependiente de root
+    keys_window.grab_set()  # Capturar el foco
     
     # Frame principal con padding
     main_container = ttk.Frame(keys_window, padding=15)
@@ -352,8 +354,8 @@ def show_common_keys():
     
     # Título
     title = ttk.Label(
-        main_container, 
-        text="📋 Teclas Comunes del Teclado", 
+        main_container,
+        text="📋 Teclas Comunes del Teclado",
         font=("-size", 13, "-weight", "bold")
     )
     title.pack(pady=(0, 15))
@@ -366,8 +368,8 @@ def show_common_keys():
     scrollbar.pack(side="right", fill="y")
     
     text_widget = ttk.Text(
-        text_frame, 
-        yscrollcommand=scrollbar.set, 
+        text_frame,
+        yscrollcommand=scrollbar.set,
         wrap="word",
         font=("-family", "Consolas", "-size", 9)
     )
@@ -396,16 +398,17 @@ space, enter, backspace, delete, insert
 
 TECLADO NUMÉRICO:
 num 0, num 1, num 2, num 3, num 4, num 5, num 6, num 7, num 8, num 9
-num lock, num /, num *, num -, num +, num enter, num .
+num lock, num *, num +, num -, num /, num enter, num .
 
 PUNTUACIÓN:
 . (period), , (comma), ; (semicolon), ' (apostrophe)
 [ (left bracket), ] (right bracket), \\ (backslash)
 - (minus), = (equal), ` (grave)
 
-NOTA: Para detectar una tecla, usa el botón "Detectar" 
-y presiona la tecla deseada en tu teclado.
-    """
+NOTA:
+Para detectar una tecla, usa el botón "Detectar" y presiona 
+la tecla deseada en tu teclado.
+"""
     
     text_widget.insert("1.0", common_keys.strip())
     text_widget.config(state="disabled")
@@ -489,70 +492,162 @@ def restore_window():
     root.attributes('-topmost', True)
     is_minimized = False
 
-
 def minimize_custom():
     """
-    Minimiza la ventana a un icono flotante personalizado.
+    Minimiza la ventana a un icono flotante ultra profesional con diseño moderno.
     """
     global is_minimized, minimized_window
-    
+
     if is_minimized:
         return
-    
+
     # Ocultar ventana principal
     root.withdraw()
-    
-    # Crear ventana flotante pequeña
+
+    # Crear ventana flotante minimalista
     minimized_window = ttk.Toplevel(root)
-    minimized_window.overrideredirect(True)  # Sin bordes de ventana
+    minimized_window.overrideredirect(True)
     minimized_window.attributes('-topmost', True)
-    
-    # Tamaño y posición del icono flotante
-    icon_size = 80
-    x_pos = root.winfo_screenwidth() - icon_size - 20
-    y_pos = 20
+    minimized_window.attributes('-alpha', 0.95)  # Ligera transparencia
+
+    # Tamaño y posición optimizados
+    icon_size = 100
+    x_pos = root.winfo_screenwidth() - icon_size - 25
+    y_pos = 25
     
     minimized_window.geometry(f"{icon_size}x{icon_size}+{x_pos}+{y_pos}")
-    
-    # Frame contenedor con estilo
+
+    # Frame contenedor moderno
     container = ttk.Frame(minimized_window, bootstyle="dark")
     container.pack(fill="both", expand=True)
-    
-    # Botón con icono para restaurar
-    restore_btn = ttk.Button(
+
+    # Canvas para diseño profesional con gradiente
+    canvas = ttk.Canvas(
         container,
-        text="🔧\nKeyForge",
-        bootstyle="info",
-        cursor="hand2"
+        width=icon_size,
+        height=icon_size,
+        highlightthickness=0,
+        bg="#0d0d0d"
     )
-    restore_btn.pack(fill="both", expand=True, padx=2, pady=2)
+    canvas.pack(fill="both", expand=True)
+
+    # Sombra exterior sutil
+    shadow_offset = 2
+    canvas.create_oval(
+        shadow_offset + 4, shadow_offset + 4,
+        icon_size - 4, icon_size - 4,
+        fill="#0a0a0a",
+        outline=""
+    )
+
+    # Círculo base con gradiente simulado (capas concéntricas)
+    margin = 6
     
-    # SOLUCIÓN MEJORADA: Vincular eventos de arrastre con detección
-    # Eventos en la ventana principal
+    # Capa exterior - tono más oscuro
+    canvas.create_oval(
+        margin, margin,
+        icon_size - margin, icon_size - margin,
+        fill="#cc5500",
+        outline="#ff6600",
+        width=2
+    )
+    
+    # Capa media - tono principal
+    canvas.create_oval(
+        margin + 6, margin + 6,
+        icon_size - margin - 6, icon_size - margin - 6,
+        fill="#ff7722",
+        outline=""
+    )
+    
+    # Capa superior - resaltado para efecto degradado
+    canvas.create_oval(
+        margin + 12, margin + 12,
+        icon_size - margin - 12, icon_size - margin - 12,
+        fill="#ff9944",
+        outline=""
+    )
+    
+    # Punto brillante (highlight) para efecto 3D
+    canvas.create_oval(
+        margin + 18, margin + 15,
+        margin + 28, margin + 25,
+        fill="#ffbb66",
+        outline=""
+    )
+
+    # Icono principal - herramienta
+    canvas.create_text(
+        icon_size // 2,
+        icon_size // 2 - 10,
+        text="🔧",
+        font=("-size", 26),
+        fill="white"
+    )
+    
+    # Texto identificador profesional
+    canvas.create_text(
+        icon_size // 2,
+        icon_size // 2 + 20,
+        text="KeyForge",
+        font=("-family", "Segoe UI", "-size", 9, "-weight", "bold"),
+        fill="white"
+    )
+    
+    # Borde brillante final
+    canvas.create_oval(
+        margin - 1, margin - 1,
+        icon_size - margin + 1, icon_size - margin + 1,
+        outline="#ffaa44",
+        width=1
+    )
+
+    # Eventos de interacción
+    def on_enter(e):
+        canvas.config(cursor="hand2")
+        minimized_window.attributes('-alpha', 1.0)  # Opacidad total al hover
+    
+    def on_leave(e):
+        canvas.config(cursor="")
+        minimized_window.attributes('-alpha', 0.95)
+    
+    # Bind de eventos
     minimized_window.bind("<Button-1>", start_move)
     minimized_window.bind("<B1-Motion>", on_move)
     minimized_window.bind("<ButtonRelease-1>", on_release)
+    minimized_window.bind("<Enter>", on_enter)
+    minimized_window.bind("<Leave>", on_leave)
     
-    # Eventos en el contenedor
+    canvas.bind("<Button-1>", start_move)
+    canvas.bind("<B1-Motion>", on_move)
+    canvas.bind("<ButtonRelease-1>", on_release)
+    canvas.bind("<Enter>", on_enter)
+    canvas.bind("<Leave>", on_leave)
+    
     container.bind("<Button-1>", start_move)
     container.bind("<B1-Motion>", on_move)
     container.bind("<ButtonRelease-1>", on_release)
+
+    # Animación de entrada (opcional)
+    def fade_in(alpha=0.0):
+        if alpha < 0.95:
+            minimized_window.attributes('-alpha', alpha)
+            root.after(10, lambda: fade_in(alpha + 0.05))
     
-    # Eventos en el botón
-    restore_btn.bind("<Button-1>", start_move)
-    restore_btn.bind("<B1-Motion>", on_move)
-    restore_btn.bind("<ButtonRelease-1>", on_release)
-    
+    fade_in()
+
     is_minimized = True
 
-# ---- INTERFAZ GRÁFICA MEJORADA -------
+# ---- INTERFAZ GRÁFICA OPTIMIZADA Y PROFESIONAL CON ARRASTRE -------
 
 root = ttk.Window(themename="darkly") 
+root.overrideredirect(True)
 root.title("KeyForge 🔧")
 root.resizable(False, False)
 
-window_width = 780
-window_height = 900
+# Dimensiones optimizadas
+window_width = 750
+window_height = 850
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -564,6 +659,22 @@ root.geometry(f"{window_width}x{window_height}+{pos_x}+{pos_y}")
 root.attributes('-topmost', True)
 root.protocol("WM_DELETE_WINDOW", on_close)
 
+# Variables globales para arrastre de ventana principal
+window_drag_x = 0
+window_drag_y = 0
+
+def start_window_drag(event):
+    """Inicia el arrastre de la ventana principal."""
+    global window_drag_x, window_drag_y
+    window_drag_x = event.x
+    window_drag_y = event.y
+
+def drag_window(event):
+    """Arrastra la ventana principal."""
+    x = root.winfo_x() + event.x - window_drag_x
+    y = root.winfo_y() + event.y - window_drag_y
+    root.geometry(f"+{x}+{y}")
+
 # Variables
 mode_var = StringVar(value="mantener")
 replace_key_var = StringVar(value="alt")
@@ -574,40 +685,39 @@ app_focus_var = BooleanVar(value=True)
 saved_config = load_config()
 apply_config(saved_config)
 
-# ------- SECCIÓN: ENCABEZADO --------
+# ------- SECCIÓN: ENCABEZADO COMPACTO (ÁREA DE ARRASTRE) --------
 
 header_frame = ttk.Frame(root)
-header_frame.pack(fill="x", padx=20, pady=(15, 10))
+header_frame.pack(fill="x", padx=20, pady=(12, 8))
+
+# Hacer el encabezado arrastrable
+header_frame.bind("<Button-1>", start_window_drag)
+header_frame.bind("<B1-Motion>", drag_window)
 
 title_label = ttk.Label(
     header_frame,
     text="KeyForge",
-    font=("-size", 18, "-weight", "bold")
+    font=("-size", 16, "-weight", "bold")
 )
 title_label.pack()
 
-subtitle_label = ttk.Label(
-    header_frame,
-    text="Remapeo Avanzado de Teclas",
-    font=("-size", 9),
-    bootstyle="secondary"
-)
-subtitle_label.pack()
+# Hacer el título arrastrable también
+title_label.bind("<Button-1>", start_window_drag)
+title_label.bind("<B1-Motion>", drag_window)
 
-# Separador
-ttk.Separator(root, orient="horizontal").pack(fill="x", padx=20, pady=10)
+# Separador delgado
+ttk.Separator(root, orient="horizontal").pack(fill="x", padx=20, pady=8)
 
-
-# ---------- SECCIÓN: ESTADO -----------
+# ---------- SECCIÓN: ESTADO COMPACTO -----------
 
 status_frame = ttk.Frame(root)
-status_frame.pack(fill="x", padx=20, pady=(0, 15))
+status_frame.pack(fill="x", padx=20, pady=(0, 10))
 
 status_label = ttk.Label(
     status_frame, 
     text="🔴 Script detenido", 
     bootstyle="danger", 
-    font=("-size", 12, "-weight", "bold")
+    font=("-size", 11, "-weight", "bold")
 ) 
 status_label.pack()
 
@@ -615,16 +725,16 @@ app_status_label = ttk.Label(
     status_frame, 
     text="❌ Esperando configuración...", 
     bootstyle="info",
-    font=("-size", 9)
+    font=("-size", 8)
 )
-app_status_label.pack(pady=(5, 0))
+app_status_label.pack(pady=(3, 0))
 
 # -------------- SECCIÓN: APLICACIÓN OBJETIVO -------------
 
-app_frame = ttk.LabelFrame(root, text="  🎯 Aplicación Objetivo  ", padding=15)
-app_frame.pack(padx=20, pady=(0, 15), fill="x")
+app_frame = ttk.LabelFrame(root, text="  🎯 Aplicación Objetivo  ", padding=12)
+app_frame.pack(padx=20, pady=(0, 10), fill="x")
 
-# Checkbox toggle
+# Checkbox toggle compacto
 check_app_focus = ttk.Checkbutton(
     app_frame,
     text="Mantener enfoque en programa específico",
@@ -632,7 +742,7 @@ check_app_focus = ttk.Checkbutton(
     command=toggle_app_focus,
     bootstyle="round-toggle"
 )
-check_app_focus.pack(anchor="w", pady=(0, 10))
+check_app_focus.pack(anchor="w", pady=(0, 8))
 
 # Selector de aplicación
 app_select_container = ttk.Frame(app_frame)
@@ -642,14 +752,14 @@ ttk.Label(
     app_select_container, 
     text="Programa:", 
     font=("-size", 9, "-weight", "bold")
-).grid(row=0, column=0, sticky="w", pady=5)
+).grid(row=0, column=0, sticky="w", pady=4)
 
 app_combo = ttk.Combobox(
     app_select_container, 
     state="readonly", 
-    width=42
+    width=40
 )
-app_combo.grid(row=0, column=1, padx=(10, 5), pady=5, sticky="ew")
+app_combo.grid(row=0, column=1, padx=(8, 4), pady=4, sticky="ew")
 app_combo.bind("<<ComboboxSelected>>", on_app_selected)
 
 btn_refresh = ttk.Button(
@@ -659,25 +769,25 @@ btn_refresh = ttk.Button(
     bootstyle="info-outline",
     width=4
 )
-btn_refresh.grid(row=0, column=2, pady=5)
+btn_refresh.grid(row=0, column=2, pady=4)
 
 app_select_container.columnconfigure(1, weight=1)
 
-# Info
+# Info reducida
 info_label = ttk.Label(
     app_frame,
-    text="💡 Desactiva el checkbox para funcionar en todos los programas",
+    text="💡 Desactiva para funcionar en todos los programas",
     font=("-size", 8),
     bootstyle="secondary"
 )
-info_label.pack(pady=(10, 0))
+info_label.pack(pady=(6, 0))
 
 # ---------- SECCIÓN: CONFIGURACIÓN DE TECLAS --------------
 
-config_frame = ttk.LabelFrame(root, text="  ⚙️ Configuración de Teclas  ", padding=15)
-config_frame.pack(padx=20, pady=(0, 15), fill="x")
+config_frame = ttk.LabelFrame(root, text="  ⚙️ Configuración de Teclas  ", padding=12)
+config_frame.pack(padx=20, pady=(0, 10), fill="x")
 
-# Grid para teclas
+# Grid para teclas compacto
 keys_grid = ttk.Frame(config_frame)
 keys_grid.pack(fill="x")
 
@@ -686,68 +796,68 @@ ttk.Label(
     keys_grid, 
     text="Tecla a Remplazar:", 
     font=("-size", 9, "-weight", "bold")
-).grid(row=0, column=0, sticky="w", pady=8)
+).grid(row=0, column=0, sticky="w", pady=6)
 
 replace_entry = ttk.Entry(
     keys_grid, 
     textvariable=replace_key_var, 
-    width=18,
-    font=("-size", 10)
+    width=16,
+    font=("-size", 9)
 )
-replace_entry.grid(row=0, column=1, padx=10, pady=8)
+replace_entry.grid(row=0, column=1, padx=8, pady=6)
 
-replace_status = ttk.Label(keys_grid, text="", width=12)
-replace_status.grid(row=0, column=2, padx=5, pady=8)
+replace_status = ttk.Label(keys_grid, text="", width=10)
+replace_status.grid(row=0, column=2, padx=4, pady=6)
 
 btn_detect_replace = ttk.Button(
     keys_grid, 
     text="Detectar",
     command=lambda: listen_for_key(replace_key_var, replace_status),
     bootstyle="info-outline",
-    width=12
+    width=10
 )
-btn_detect_replace.grid(row=0, column=3, pady=8)
+btn_detect_replace.grid(row=0, column=3, pady=6)
 
 # Tecla de Reemplazo
 ttk.Label(
     keys_grid, 
     text="Remplazar con:", 
     font=("-size", 9, "-weight", "bold")
-).grid(row=1, column=0, sticky="w", pady=8)
+).grid(row=1, column=0, sticky="w", pady=6)
 
 replacement_entry = ttk.Entry(
     keys_grid, 
     textvariable=replacement_key_var, 
-    width=18,
-    font=("-size", 10)
+    width=16,
+    font=("-size", 9)
 )
-replacement_entry.grid(row=1, column=1, padx=10, pady=8)
+replacement_entry.grid(row=1, column=1, padx=8, pady=6)
 
-replacement_status = ttk.Label(keys_grid, text="", width=12)
-replacement_status.grid(row=1, column=2, padx=5, pady=8)
+replacement_status = ttk.Label(keys_grid, text="", width=10)
+replacement_status.grid(row=1, column=2, padx=4, pady=6)
 
 btn_detect_replacement = ttk.Button(
     keys_grid, 
     text="Detectar",
     command=lambda: listen_for_key(replacement_key_var, replacement_status),
     bootstyle="info-outline",
-    width=12
+    width=10
 )
-btn_detect_replacement.grid(row=1, column=3, pady=8)
+btn_detect_replacement.grid(row=1, column=3, pady=6)
 
-# Botón de ayuda
+# Botón de ayuda compacto
 btn_show_keys = ttk.Button(
     config_frame,
-    text="📋 Ver Lista de Teclas Comunes",
+    text="📋 Ver Teclas Comunes",
     command=show_common_keys,
     bootstyle="secondary-outline"
 )
-btn_show_keys.pack(fill="x", pady=(15, 0))
+btn_show_keys.pack(fill="x", pady=(10, 0))
 
 # ------------ SECCIÓN: MODO DE OPERACIÓN ---------------
 
-mode_frame = ttk.LabelFrame(root, text="  🎮 Modo de Operación  ", padding=15)
-mode_frame.pack(padx=20, pady=(0, 15), fill="x")
+mode_frame = ttk.LabelFrame(root, text="  🎮 Modo de Operación  ", padding=12)
+mode_frame.pack(padx=20, pady=(0, 10), fill="x")
 
 radio_mantener = ttk.Radiobutton(
     mode_frame, 
@@ -755,7 +865,7 @@ radio_mantener = ttk.Radiobutton(
     variable=mode_var, 
     value="mantener"
 )
-radio_mantener.pack(anchor="w", pady=5)
+radio_mantener.pack(anchor="w", pady=4)
 
 radio_intercalar = ttk.Radiobutton(
     mode_frame, 
@@ -763,20 +873,16 @@ radio_intercalar = ttk.Radiobutton(
     variable=mode_var, 
     value="intercalar"
 )
-radio_intercalar.pack(anchor="w", pady=5)
+radio_intercalar.pack(anchor="w", pady=4)
 
 # ----------- SECCIÓN: CONTROLES PRINCIPALES ------------
 
 controls_frame = ttk.Frame(root)
-controls_frame.pack(fill="x", padx=20, pady=(0, 15))
+controls_frame.pack(fill="x", padx=20, pady=(0, 10))
 
-# Grid de botones principales
-btn_grid = ttk.Frame(controls_frame)
-btn_grid.pack(fill="x")
-
-# Botón activar/detener (más grande)
+# Botón activar/detener destacado
 toggle_btn = ttk.Button(
-    btn_grid, 
+    controls_frame, 
     text="▶ Activar Script", 
     command=toggle_script, 
     bootstyle="success"
@@ -784,7 +890,7 @@ toggle_btn = ttk.Button(
 toggle_btn.pack(fill="x", pady=(0, 8), ipady=8)
 
 # Grid para botones secundarios
-secondary_btns = ttk.Frame(btn_grid)
+secondary_btns = ttk.Frame(controls_frame)
 secondary_btns.pack(fill="x")
 
 btn_save_config = ttk.Button(
@@ -811,16 +917,16 @@ exit_btn = ttk.Button(
 )
 exit_btn.pack(side="left", fill="x", expand=True, padx=(4, 0))
 
-# ------- FOOTER -------------
+# ------- FOOTER VISIBLE -------------
 
-ttk.Separator(root, orient="horizontal").pack(fill="x", padx=20, pady=(10, 10))
+ttk.Separator(root, orient="horizontal").pack(fill="x", padx=20, pady=8)
 
 footer_frame = ttk.Frame(root)
-footer_frame.pack(fill="x", padx=20, pady=(0, 15))
+footer_frame.pack(fill="x", padx=20, pady=(0, 12))
 
 config_info = ttk.Label(
     footer_frame,
-    text=f"📂 Configuración: {CONFIG_FILE.name}",
+    text=f"📂 Config: {CONFIG_FILE.name}",
     font=("-size", 8),
     bootstyle="secondary"
 )
@@ -828,11 +934,11 @@ config_info.pack()
 
 version_label = ttk.Label(
     footer_frame,
-    text="v1.1.0 • KeyForge",
-    font=("-size", 7),
+    text="v1.1.1 • KeyForge",
+    font=("-size", 8),
     bootstyle="secondary"
 )
-version_label.pack()
+version_label.pack(pady=(2, 0))
 
 # Inicialización
 refresh_windows_list()
