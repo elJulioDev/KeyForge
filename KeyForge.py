@@ -31,7 +31,8 @@ DEFAULT_CONFIG = {
     "key_to_replace": "alt",
     "replacement_key": "shift",
     "enforce_app_focus": True,
-    "target_app_name": ""
+    "target_app_name": "",
+    "lang": "en"
 }
 
 # --- Variables Globales ---
