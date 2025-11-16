@@ -37,7 +37,17 @@
     "error_msg": "❌ Error: {err}",
     "saved_title": "Configuración Guardada",
     "saved_msg": "✅ Configuración guardada exitosamente en:\n{config_file}",
-    "refresh_error": "Error al obtener ventanas"
+    "refresh_error": "Error al obtener ventanas",
+    "keys_letters": "LETRAS:",
+    "keys_numbers": "NÚMEROS:",
+    "keys_function": "TECLAS DE FUNCIÓN:",
+    "keys_modifiers": "MODIFICADORES:",
+    "keys_navigation": "NAVEGACIÓN:",
+    "keys_special": "ESPECIALES:",
+    "keys_numpad": "TECLADO NUMÉRICO:",
+    "keys_punctuation": "PUNTUACIÓN:",
+    "keys_note": "NOTA:",
+    "keys_note_text": "Para detectar una tecla, usa el botón \"Detectar\" y presiona\nla tecla deseada en tu teclado."
   },
   "en": {
     "title": "KeyForge",
@@ -77,6 +87,16 @@
     "error_msg": "❌ Error: {err}",
     "saved_title": "Configuration Saved",
     "saved_msg": "✅ Configuration successfully saved at:\n{config_file}",
-    "refresh_error": "Could not fetch windows"
+    "refresh_error": "Could not fetch windows",
+    "keys_letters": "LETTERS:",
+    "keys_numbers": "NUMBERS:",
+    "keys_function": "FUNCTION KEYS:",
+    "keys_modifiers": "MODIFIERS:",
+    "keys_navigation": "NAVIGATION:",
+    "keys_special": "SPECIAL:",
+    "keys_numpad": "NUMERIC KEYPAD:",
+    "keys_punctuation": "PUNCTUATION:",
+    "keys_note": "NOTE:",
+    "keys_note_text": "To detect a key, use the \"Detect\" button and press\nthe desired key on your keyboard."
   }
 }

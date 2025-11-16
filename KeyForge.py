@@ -357,14 +357,14 @@ def listen_for_key(target_var, target_label):
 def show_common_keys():
     """Muestra una ventana con las teclas más comunes."""
     keys_window = ttk.Toplevel(root)
-    keys_window.title("Teclas Disponibles")
+    keys_window.title(tr["common_keys_title"])
     keys_window.geometry("520x450")
     keys_window.resizable(False, False)
     
-    # CORRECCIÓN: Asegurar que la ventana aparezca encima
+    # Asegurar que la ventana aparezca encima
     keys_window.attributes('-topmost', True)
-    keys_window.transient(root)  # Hacer que sea dependiente de root
-    keys_window.grab_set()  # Capturar el foco
+    keys_window.transient(root)
+    keys_window.grab_set()
     
     # Frame principal con padding
     main_container = ttk.Frame(keys_window, padding=15)
@@ -373,7 +373,7 @@ def show_common_keys():
     # Título
     title = ttk.Label(
         main_container,
-        text="📋 Teclas Comunes del Teclado",
+        text=tr["common_keys_desc"],
         font=("-size", 13, "-weight", "bold")
     )
     title.pack(pady=(0, 15))
@@ -394,38 +394,45 @@ def show_common_keys():
     text_widget.pack(side="left", fill="both", expand=True)
     scrollbar.config(command=text_widget.yview)
     
-    # Lista de teclas comunes
-    common_keys = """
-LETRAS:
+    # Lista de teclas comunes con traducciones
+    common_keys = f"""
+{tr["keys_letters"]}
 a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
 
-NÚMEROS:
+
+{tr["keys_numbers"]}
 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 
-TECLAS DE FUNCIÓN:
+
+{tr["keys_function"]}
 f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12
 
-MODIFICADORES:
+
+{tr["keys_modifiers"]}
 shift, ctrl, alt, caps lock, tab, esc
 
-NAVEGACIÓN:
+
+{tr["keys_navigation"]}
 up, down, left, right, home, end, page up, page down
 
-ESPECIALES:
+
+{tr["keys_special"]}
 space, enter, backspace, delete, insert
 
-TECLADO NUMÉRICO:
+
+{tr["keys_numpad"]}
 num 0, num 1, num 2, num 3, num 4, num 5, num 6, num 7, num 8, num 9
 num lock, num *, num +, num -, num /, num enter, num .
 
-PUNTUACIÓN:
+
+{tr["keys_punctuation"]}
 . (period), , (comma), ; (semicolon), ' (apostrophe)
 [ (left bracket), ] (right bracket), \\ (backslash)
 - (minus), = (equal), ` (grave)
 
-NOTA:
-Para detectar una tecla, usa el botón "Detectar" y presiona 
-la tecla deseada en tu teclado.
+
+{tr["keys_note"]}
+{tr["keys_note_text"]}
 """
     
     text_widget.insert("1.0", common_keys.strip())
@@ -434,7 +441,7 @@ la tecla deseada en tu teclado.
     # Botón de cerrar
     btn_close = ttk.Button(
         main_container,
-        text="Cerrar",
+        text=tr["close_btn"],
         command=keys_window.destroy,
         bootstyle="secondary"
     )
