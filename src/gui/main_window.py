@@ -42,6 +42,10 @@ class KeyForgeApp:
         
         # GUI
         self._create_window()
+
+        # THREAD SAFETY: Configurar el root en el key_handler
+        self.key_handler.set_tk_root(self.root)
+
         self._create_components()
         self._load_configuration()
         self._start_app_monitoring()
