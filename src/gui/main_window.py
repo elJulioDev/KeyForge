@@ -1,336 +1,310 @@
 """
-Ventana principal de la aplicación KeyForge
+Ventana principal de la aplicación KeyForge - Diseño Tabulado
 """
 import ttkbootstrap as ttk
 from tkinter import messagebox
-
+import sys
 from ..config import ConfigManager
 from ..core import KeyHandler, AppMonitor
 from ..utils import WindowManager
 from .components import (
     StatusComponent,
-    KeyConfigComponent,
-    ModeComponent,
     AppFocusComponent,
-    ControlButtonsComponent,
-    CommonKeysWindow
+    ControlButtonsComponent
 )
+from .rules_manager import RulesManagerComponent
 from .minimized_window import MinimizedWindow
 
 
 class KeyForgeApp:
-    """Aplicación principal de KeyForge"""
-    
     def __init__(self):
-        # Configuración
         self.config_manager = ConfigManager()
-        
-        # Core
         self.app_monitor = AppMonitor()
         self.key_handler = KeyHandler(self.app_monitor)
-        
-        # Utilidades
         self.window_manager = WindowManager()
         
-        # Estado
         self.is_minimized = False
         self.minimized_window = None
+        self.drag_data = {"x": 0, "y": 0}
         
-        # Variables para arrastre de ventana
-        self.window_drag_x = 0
-        self.window_drag_y = 0
-        
-        # GUI
         self._create_window()
-
-        # THREAD SAFETY: Configurar el root en el key_handler
         self.key_handler.set_tk_root(self.root)
-
-        self._create_components()
+        
+        self._create_ui_structure()
         self._load_configuration()
-        self._start_app_monitoring()
-    
+
+        self._finalize_window_layout()
+        self._init_monitoring()
+
     def _create_window(self):
-        """Crea y configura la ventana principal"""
         self.root = ttk.Window(themename="darkly")
         self.root.overrideredirect(True)
         self.root.title("KeyForge")
         self.root.resizable(False, False)
-        
-        # Dimensiones y posición EXACTAS del original
-        window_width = 750
-        window_height = 850
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        pos_x = int(screen_width / 2 - window_width / 2)
-        pos_y = int(screen_height / 2 - window_height / 2)
-        
-        self.root.geometry(f"{window_width}x{window_height}+{pos_x}+{pos_y}")
         self.root.attributes('-topmost', True)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-    
-    def _create_components(self):
-        """Crea todos los componentes de la GUI EN EL ORDEN EXACTO DEL ORIGINAL"""
+        # NOTA: Ya no definimos geometry aquí con w, h fijos.
+        # Se definirá en _finalize_window_layout
+
+    def _finalize_window_layout(self):
+        """Calcula el tamaño ideal basado en el contenido de las pestañas"""
+        self.root.update_idletasks()
+        
+        # Obtenemos tamaño requerido
+        req_w = self.root.winfo_reqwidth()
+        req_h = self.root.winfo_reqheight()
+        
+        # Aseguramos un ancho mínimo para que no se vea muy estrecho
+        final_w = max(req_w, 650) 
+        # Aseguramos un alto mínimo
+        final_h = max(req_h, 550)
+        
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        
+        x = int((screen_w / 2) - (final_w / 2))
+        y = int((screen_h / 2) - (final_h / 2))
+        
+        self.root.geometry(f"{final_w}x{final_h}+{x}+{y}")
+
+    def _create_ui_structure(self):
         tr = self.config_manager.tr
         
-        # ------- SECCIÓN ENCABEZADO COMPACTO (ÁREA DE ARRASTRE) --------
-        header_frame = ttk.Frame(self.root)
-        header_frame.pack(fill="x", padx=20, pady=(12, 8))
+        # --- 1. HEADER (Solo Título y Arrastre) ---
+        header = ttk.Frame(self.root, bootstyle="secondary")
+        header.pack(fill="x", ipady=5)
         
-        title_label = ttk.Label(
-            header_frame,
-            text="KeyForge",
-            font=("-size", 16, "-weight", "bold")
-        )
-        title_label.pack()
-        
-        # Hacer el encabezado arrastrable
-        header_frame.bind("<Button-1>", self._start_window_drag)
-        header_frame.bind("<B1-Motion>", self._drag_window)
-        title_label.bind("<Button-1>", self._start_window_drag)
-        title_label.bind("<B1-Motion>", self._drag_window)
-
-        # Separador delgado
-        ttk.Separator(self.root, orient="horizontal").pack(fill="x", padx=20, pady=8)
-        
-        # ---------- SECCIÓN ESTADO COMPACTO -----------
-        self.status_component = StatusComponent(self.root, tr)
-        
-        # -------------- SECCIÓN APLICACIÓN OBJETIVO (ARRIBA) -------------
-        self.app_focus_component = AppFocusComponent(
-            self.root,
-            tr,
-            self._refresh_windows_list,
-            self._toggle_app_focus,
-            self._on_app_selected
-        )
-        
-        # ---------- SECCIÓN CONFIGURACIÓN DE TECLAS --------------
-        self.key_config_component = KeyConfigComponent(
-            self.root,
-            tr,
-            self._on_detect_key,
-            self._show_common_keys
-        )
-        
-        # ------------ SECCIÓN MODO DE OPERACIÓN ---------------
-        self.mode_component = ModeComponent(self.root, tr)
-        
-        
-        # ----------- SECCIÓN CONTROLES PRINCIPALES ------------
-        self.control_buttons = ControlButtonsComponent(
-            self.root,
-            tr,
-            self._toggle_script,
-            self._save_config,
-            self._minimize_custom,
-            self._on_close
-        )
-        
-        # Separador delgado
-        ttk.Separator(self.root, orient="horizontal").pack(fill="x", padx=20, pady=8)
-        
-        # ------- FOOTER VISIBLE -------------
-        self._create_footer()
-    
-    def _create_footer(self):
-        """Crea el footer con información"""
-        footer_frame = ttk.Frame(self.root)
-        footer_frame.pack(fill="x", padx=20, pady=(0, 12))
-        
-        from ..config import CONFIG_FILE
+        # Título (sin botones de ventana)
         from .. import __version__
+        title = ttk.Label(header, text=f"🔧 KeyForge v{__version__}", font=("Segoe UI", 12, "bold"), bootstyle="inverse-secondary")
+        title.pack(side="left", padx=15) # Alineado a la izquierda
+
+        # Arrastre (Vinculado al header y al título)
+        for w in [header, title]:
+            w.bind("<Button-1>", self._start_drag)
+            w.bind("<B1-Motion>", self._do_drag)
+
+        # --- 2. CUERPO PRINCIPAL (Pestañas) ---
+        self.notebook = ttk.Notebook(self.root, bootstyle="primary")
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
         
-        config_info = ttk.Label(
-            footer_frame,
-            text=f"📁 Config: {CONFIG_FILE.name}",
-            font=("-size", 8),
-            bootstyle="secondary"
-        )
-        config_info.pack()
+        # Pestaña 1: Dashboard
+        self.tab_dashboard = ttk.Frame(self.notebook, padding=15)
+        self.notebook.add(self.tab_dashboard, text=f" {tr.get('title', 'Dashboard')} ")
         
-        version_label = ttk.Label(
-            footer_frame,
-            text=f"v{__version__} | KeyForge",
-            font=("-size", 8),
-            bootstyle="secondary"
+        # Pestaña 2: Reglas
+        self.tab_rules = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(self.tab_rules, text=f" {tr.get('rules_title', 'Rules')} ")
+
+        # --- CONTENIDO DASHBOARD ---
+        self.status_component = StatusComponent(self.tab_dashboard, tr)
+        
+        ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
+        
+        self.app_focus_component = AppFocusComponent(
+            self.tab_dashboard, tr, 
+            self._refresh_windows_list, self._toggle_app_focus, self._on_app_selected
         )
-        version_label.pack(pady=(2, 0))
+        
+        ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
+
+        # MODIFICADO: Pasamos los 4 callbacks necesarios
+        self.control_buttons = ControlButtonsComponent(
+            self.tab_dashboard, 
+            tr,
+            on_toggle_callback=self._toggle_script, 
+            on_save_callback=self._save_config,
+            on_minimize_callback=self._minimize_custom, # Callback Minimizar
+            on_exit_callback=self._on_close           # Callback Salir
+        )
+
+        # --- CONTENIDO REGLAS ---
+        self.rules_manager = RulesManagerComponent(
+            self.tab_rules, tr,
+            on_detect_key_callback=self._on_detect_key_request
+        )
+        
+        self.rules_manager.on_add_rule = self._add_rule_logic
+        self.rules_manager.on_edit_rule = self._edit_rule_logic
+        self.rules_manager.on_delete_rule = self._delete_rule_logic
+
+    # --- Lógica de Reglas ---
     
-    def _start_window_drag(self, event):
-        """Inicia el arrastre de la ventana principal"""
-        self.window_drag_x = event.x
-        self.window_drag_y = event.y
-    
-    def _drag_window(self, event):
-        """Arrastra la ventana principal"""
-        x = self.root.winfo_x() + event.x - self.window_drag_x
-        y = self.root.winfo_y() + event.y - self.window_drag_y
-        self.root.geometry(f"+{x}+{y}")
-    
+    def _add_rule_logic(self, rule_data):
+        success, error = self.key_handler.add_rule(
+            rule_data['key_to_replace'], rule_data['replacement_key'],
+            rule_data['mode'], rule_data['enabled']
+        )
+        if success: self._refresh_rules_ui()
+        else: messagebox.showerror("Error", error)
+
+    def _edit_rule_logic(self, index, rule_data):
+        # Lógica para actualizar la regla existente en el core
+        success, error = self.key_handler.update_rule(
+            index,
+            rule_data['key_to_replace'], rule_data['replacement_key'],
+            rule_data['mode'], rule_data['enabled']
+        )
+        if success: self._refresh_rules_ui()
+        else: messagebox.showerror("Error", error)
+
+    def _delete_rule_logic(self, index):
+        if self.key_handler.remove_rule(index): self._refresh_rules_ui()
+
+    def _refresh_rules_ui(self):
+        self.rules_manager.load_rules(self.key_handler.get_rules())
+
+    def _on_detect_key_request(self, callback):
+        self.key_handler.listen_for_key(callback)
+
+    # --- Core Logic & Config (Igual que antes) ---
     def _load_configuration(self):
-        """Carga la configuración guardada"""
         config = self.config_manager.config
-        
-        # Aplicar configuración al monitor de apps
         self.app_monitor.set_enforce_focus(config.get("enforce_app_focus", True))
         self.app_monitor.set_target_app(config.get("target_app_name", ""))
         
-        # Aplicar configuración al manejador de teclas
-        self.key_handler.set_keys(
-            config.get("key_to_replace", "alt"),
-            config.get("replacement_key", "shift")
-        )
-        self.key_handler.set_mode(config.get("mode", "mantener"))
-        
-        # Actualizar componentes visuales
-        self.key_config_component.replace_key_var.set(config.get("key_to_replace", "alt"))
-        self.key_config_component.replacement_key_var.set(config.get("replacement_key", "shift"))
-        self.mode_component.mode_var.set(config.get("mode", "mantener"))
         self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
+        if config.get("target_app_name"):
+            self.app_focus_component.set_app_name(config.get("target_app_name"))
+            
+        rules_data = config.get("rules", [])
+        if rules_data:
+            self.key_handler.load_rules(rules_data)
         
-        # Cargar app guardada
-        saved_app = config.get("target_app_name", "")
-        if saved_app and self.app_focus_component.is_focus_enabled():
-            self.app_focus_component.set_app_name(saved_app)
-        
-        # Actualizar lista de ventanas
+        self._refresh_rules_ui()
         self._refresh_windows_list()
         self._toggle_app_focus()
-    
+
     def _save_config(self):
         """Guarda la configuración actual"""
-        keys = self.key_config_component.get_keys()
-        mode = self.mode_component.get_mode()
+        # 1. Obtener datos de los componentes VIGENTES
         app_name = self.app_focus_component.get_app_name()
         enforce_focus = self.app_focus_component.is_focus_enabled()
-    
+        
+        # 2. Obtener las reglas directamente del manejador (Core)
+        # Ya no usamos key_config_component ni mode_component
+        rules_to_save = [rule.to_dict() for rule in self.key_handler.get_rules()]
+        
         config_data = {
-            "mode": mode,
-            "key_to_replace": keys["replace"],
-            "replacement_key": keys["replacement"],
+            "rules": rules_to_save,
             "enforce_app_focus": enforce_focus,
             "target_app_name": app_name if enforce_focus else ""
         }
-    
+        
+        # 3. Guardar usando el ConfigManager
         if self.config_manager.save_config(config_data):
             from ..config import CONFIG_FILE
-        
-            # Obtener el mensaje con el placeholder correcto
-            message = self.config_manager.tr.get(
-                "saved_msg", 
-                "Configuración guardada exitosamente en:\n{configfile}"
-            )
-        
-            # Reemplazar {configfile} con la ruta real
-            message = message.replace("{configfile}", str(CONFIG_FILE))
-        
-            messagebox.showinfo(
-                self.config_manager.tr.get("saved_title", "Configuración Guardada"),
-                message
-            )
-    
+            
+            # 4. Mensaje de éxito TRADUCIDO
+            title = self.config_manager.tr.get("saved_title", "Configuration Saved")
+            
+            # Obtenemos el template traducido (ej: "Guardado en:\n{configfile}")
+            msg_template = self.config_manager.tr.get("saved_msg", "Saved in:\n{configfile}")
+            
+            # Reemplazamos el placeholder con la ruta real
+            msg = msg_template.replace("{configfile}", str(CONFIG_FILE))
+            
+            messagebox.showinfo(title, msg)
+
+    def _add_rule_logic(self, rule_data):
+        success, error = self.key_handler.add_rule(
+            rule_data['key_to_replace'], rule_data['replacement_key'],
+            rule_data['mode'], rule_data['enabled']
+        )
+        if success:
+            self._refresh_rules_ui()
+        else:
+            # TRADUCIR TÍTULO Y MAPEAR ERROR
+            err_title = self.config_manager.tr.get("error_title", "Error")
+            # Traducir el mensaje de error que viene del backend (ver Paso 2)
+            err_msg = self.config_manager.tr.get(error, error) 
+            messagebox.showerror(err_title, err_msg)
+
+    def _edit_rule_logic(self, index, rule_data):
+        success, error = self.key_handler.update_rule(
+            index,
+            rule_data['key_to_replace'], rule_data['replacement_key'],
+            rule_data['mode'], rule_data['enabled']
+        )
+        if success:
+            self._refresh_rules_ui()
+        else:
+            # TRADUCIR TÍTULO Y MAPEAR ERROR
+            err_title = self.config_manager.tr.get("error_title", "Error")
+            err_msg = self.config_manager.tr.get(error, error)
+            messagebox.showerror(err_title, err_msg)
+
     def _toggle_script(self):
-        """Activa o desactiva el script"""
         if self.key_handler.is_active():
-            # Detener el script
             self.key_handler.stop()
             self.status_component.update_script_status(False)
             self.control_buttons.set_toggle_state(False)
-            self._enable_controls(True)
+            self.rules_manager.set_controls_state(True)
+            self.app_focus_component.set_controls_state(True)
         else:
-            # Iniciar el script
-            keys = self.key_config_component.get_keys()
-            mode = self.mode_component.get_mode()
+            if not self.key_handler.get_rules():
+                messagebox.showwarning("KeyForge", "Add at least one rule first.")
+                return
             
-            self.key_handler.set_keys(keys["replace"], keys["replacement"])
-            self.key_handler.set_mode(mode)
-            
-            # Actualizar configuración del monitor
             self.app_monitor.set_enforce_focus(self.app_focus_component.is_focus_enabled())
             self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
             
-            self.key_handler.start()
-            
-            mode_text = self.config_manager.tr.get("hold", "Mantener") if mode == "mantener" else self.config_manager.tr.get("toggle", "Intercalar")
-            
-            self.status_component.update_script_status(True, {
-                "src": keys["replace"],
-                "dst": keys["replacement"],
-                "mode": mode_text
-            })
-            self.control_buttons.set_toggle_state(True)
-            self._enable_controls(False)
-    
-    def _enable_controls(self, enabled):
-        """Habilita o deshabilita los controles de configuración"""
-        self.key_config_component.set_controls_state(enabled)
-        self.mode_component.set_controls_state(enabled)
-        self.app_focus_component.set_controls_state(enabled)
-    
-    def _on_detect_key(self, target_var, status_label):
-        """Detecta una tecla presionada"""
-        self.key_handler.listen_for_key(lambda key, error: self._key_detected(key, error, target_var, status_label))
-        status_label.config(text=self.config_manager.tr.get("press_key_label", "Presiona una tecla..."))
-    
-    def _key_detected(self, key, error, target_var, status_label):
-        """Callback cuando se detecta una tecla"""
-        if error:
-            status_label.config(text=f"❌ Error: {error}")
-        elif key:
-            target_var.set(key)
-            status_label.config(text=f"✅ {key}")
-            
-            # Restaurar texto original después de 2 segundos
-            self.root.after(2000, lambda: status_label.config(text=""))
-    
-    def _show_common_keys(self):
-        """Muestra la ventana de teclas comunes"""
-        CommonKeysWindow(self.root, self.config_manager.tr)
-    
+            success, error = self.key_handler.start()
+            if success:
+                self.status_component.update_script_status(True, len(self.key_handler.get_rules()))
+                self.control_buttons.set_toggle_state(True)
+                self.rules_manager.set_controls_state(False)
+                self.app_focus_component.set_controls_state(False)
+            else:
+                messagebox.showerror("Error", error)
+
+    def _init_monitoring(self):
+        def on_app_change(active):
+            self.status_component.update_app_status(
+                not self.app_monitor.enforce_app_focus, active, self.app_monitor.target_app_name
+            )
+        if sys.platform == 'win32':
+            if self.app_monitor.use_event_monitoring(on_app_change): return
+        self._start_polling_monitoring()
+
+    def _start_polling_monitoring(self):
+        self.app_monitor.update_status()
+        self.status_component.update_app_status(
+            not self.app_monitor.enforce_app_focus, 
+            self.app_monitor.target_app_is_active, 
+            self.app_monitor.target_app_name
+        )
+        self.root.after(500, self._start_polling_monitoring)
+
+    # --- Window Utilities ---
     def _refresh_windows_list(self):
-        """Actualiza la lista de ventanas abiertas"""
-        windows = self.app_monitor.get_all_windows()
-        self.app_focus_component.update_app_list(windows)
-    
+        self.app_focus_component.update_app_list(self.app_monitor.get_all_windows())
+
     def _toggle_app_focus(self):
-        """Alterna el modo de enfoque de aplicación"""
         enforce = self.app_focus_component.is_focus_enabled()
         self.app_monitor.set_enforce_focus(enforce)
-        
         if enforce:
-            app_name = self.app_focus_component.get_app_name()
-            self.app_monitor.set_target_app(app_name)
             self.app_focus_component.app_combo.config(state="readonly")
             self.app_focus_component.btn_refresh.config(state="normal")
         else:
             self.app_focus_component.app_combo.config(state="disabled")
             self.app_focus_component.btn_refresh.config(state="disabled")
-        
-        self._update_app_status()
-    
+        self.app_monitor.update_status()
+
     def _on_app_selected(self):
-        """Callback cuando se selecciona una aplicación"""
         if self.app_focus_component.is_focus_enabled():
-            app_name = self.app_focus_component.get_app_name()
-            self.app_monitor.set_target_app(app_name)
-            self._update_app_status()
-    
-    def _start_app_monitoring(self):
-        """Inicia el monitoreo automático de la aplicación"""
-        self._update_app_status()
-    
-    def _update_app_status(self):
-        """Actualiza el estado de la aplicación (llamado recursivamente)"""
-        is_global = not self.app_monitor.enforce_app_focus
-        is_active = self.app_monitor.update_status()
-        app_name = self.app_monitor.target_app_name
-        
-        self.status_component.update_app_status(is_global, is_active, app_name)
-        
-        # Llamar de nuevo en 500ms
-        self.root.after(500, self._update_app_status)
-    
+            self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
+            self.app_monitor.update_status()
+
+    def _start_drag(self, event):
+        self.drag_data["x"] = event.x
+        self.drag_data["y"] = event.y
+
+    def _do_drag(self, event):
+        x = self.root.winfo_x() + event.x - self.drag_data["x"]
+        y = self.root.winfo_y() + event.y - self.drag_data["y"]
+        self.root.geometry(f"+{x}+{y}")
+
     def _minimize_custom(self):
         """Minimiza la ventana a un icono flotante"""
         if self.is_minimized:
@@ -338,25 +312,23 @@ class KeyForgeApp:
         
         self.root.withdraw()
         self.minimized_window = MinimizedWindow(self.root, self._restore_window)
-        self.minimized_window.show()
-        self.is_minimized = True
-    
-    def _restore_window(self):
-        """Restaura la ventana desde el estado minimizado"""
-        if self.minimized_window:
-            self.minimized_window.hide()
-            self.minimized_window = None
         
+        # CAMBIO AQUÍ: Obtenemos el estado real del key_handler
+        is_script_active = self.key_handler.is_active()
+        
+        # Pasamos el estado al mostrar la ventana
+        self.minimized_window.show(is_active=is_script_active)
+        
+        self.is_minimized = True
+
+    def _restore_window(self):
+        if self.minimized_window: self.minimized_window.hide()
         self.root.deiconify()
-        self.root.attributes('-topmost', True)
         self.is_minimized = False
-    
+
     def _on_close(self):
-        """Maneja el cierre de la aplicación"""
-        if self.key_handler.is_active():
-            self.key_handler.stop()
+        if self.key_handler.is_active(): self.key_handler.stop()
         self.root.destroy()
-    
+
     def run(self):
-        """Inicia el loop principal de la aplicación"""
         self.root.mainloop()

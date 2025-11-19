@@ -4,7 +4,7 @@ Utilidades para manejo de ventanas
 
 
 class WindowManager:
-    """Gestiona operaciones de ventanas como arrastre"""
+    """Gestiona operaciones de ventanas como arrastre y centrado dinámico"""
     
     def __init__(self):
         self.is_dragging = False
@@ -34,3 +34,27 @@ class WindowManager:
         was_click = distance < 5 and not self.is_dragging
         self.is_dragging = False
         return was_click
+
+    def center_and_resize(self, window, parent=None):
+        """
+        Calcula el tamaño necesario para el contenido y centra la ventana.
+        """
+        # Ocultar ventana mientras se calcula para evitar parpadeos
+        window.withdraw()
+        window.update_idletasks()  # Forzar cálculo de dimensiones
+        
+        # Obtener tamaño requerido por los widgets + un poco de padding
+        req_w = window.winfo_reqwidth() + 20
+        req_h = window.winfo_reqheight() + 20
+        
+        # Obtener dimensiones de pantalla
+        screen_w = window.winfo_screenwidth()
+        screen_h = window.winfo_screenheight()
+        
+        # Calcular posición centrada
+        x = int((screen_w / 2) - (req_w / 2))
+        y = int((screen_h / 2) - (req_h / 2))
+        
+        # Aplicar geometría
+        window.geometry(f"{req_w}x{req_h}+{x}+{y}")
+        window.deiconify()  # Mostrar ventana

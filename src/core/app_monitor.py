@@ -56,5 +56,45 @@ class AppMonitor:
                     seen.add(window)
             return unique_windows
         except Exception as e:
-            print(f"❌ Error al obtener ventanas: {e}")
+            print(f"Error al obtener ventanas: {e}")
             return []
+
+    def use_event_monitoring(self, callback):
+        """
+        Activa monitoreo basado en eventos (solo Windows).
+        
+        Args:
+            callback: Función que se llama cuando cambia la ventana activa
+        
+        Returns:
+            True si se activó correctamente, False si no está disponible
+        """
+        try:
+            from .window_event_monitor import WindowEventMonitor, is_event_monitoring_available
+            
+            if not is_event_monitoring_available():
+                return False
+            
+            def on_window_change(window_title):
+                # Actualizar estado cuando cambia la ventana
+                if self.target_app_name.lower() in window_title.lower():
+                    self.target_app_is_active = True
+                else:
+                    self.target_app_is_active = False
+                
+                # Llamar callback externo
+                if callback:
+                    callback(self.target_app_is_active)
+            
+            self.event_monitor = WindowEventMonitor(on_window_change)
+            self.event_monitor.start()
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Event monitoring no disponible: {e}")
+            return False
+    
+    def stop_event_monitoring(self):
+        """Detiene el monitoreo por eventos"""
+        if hasattr(self, 'event_monitor'):
+            self.event_monitor.stop()

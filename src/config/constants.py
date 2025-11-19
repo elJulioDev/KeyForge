@@ -56,11 +56,9 @@ CONFIG_FILE = DATA_DIR / "config.json"
 # Crear carpeta data si no existe
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# --- Configuración por Defecto ---
+# --- Configuración por Defecto Actualizada ---
 DEFAULT_CONFIG = {
-    "mode": "mantener",
-    "key_to_replace": "alt",
-    "replacement_key": "shift",
+    "rules": [],               # Lista limpia de reglas
     "enforce_app_focus": True,
     "target_app_name": "",
     "lang": "en"

@@ -3,7 +3,7 @@ Componentes individuales de la interfaz gráfica
 """
 import ttkbootstrap as ttk
 from tkinter import StringVar, BooleanVar, messagebox
-
+from ..utils import WindowManager
 
 class StatusComponent:
     """Componente que muestra el estado del script y la aplicación"""
@@ -31,20 +31,17 @@ class StatusComponent:
         )
         self.app_status_label.pack(pady=(3, 0))
     
-    def update_script_status(self, is_active, key_info=None):
-        """Actualiza el estado del script (activo/detenido)"""
-        if is_active:
-            text = self.tr.get("status_running", "Activo").format(
-                src=key_info['src'],
-                dst=key_info['dst'],
-                mode=key_info['mode']
-            ) if key_info else self.tr.get("status_running", "Activo")
-            self.status_label.config(text=text, bootstyle="success")
-        else:
-            self.status_label.config(
-                text=self.tr.get("status_stopped", "Detenido"),
-                bootstyle="danger"
-            )
+    def update_script_status(self, is_active, rule_count=0):
+            """Actualiza el estado del script"""
+            if is_active:
+                # Mensaje genérico para múltiples reglas
+                text = f"🟢 {self.tr.get('active_rules', 'Activo')}: {rule_count} {self.tr.get('rule_label', 'Reglas')}"
+                self.status_label.config(text=text, bootstyle="success")
+            else:
+                self.status_label.config(
+                    text=self.tr.get("status_stopped", "Detenido"),
+                    bootstyle="danger"
+                )
     
     def update_app_status(self, is_global, is_detected, app_name=""):
         """Actualiza el estado de detección de la aplicación"""
@@ -316,32 +313,31 @@ class AppFocusComponent:
         """Retorna si el enfoque está habilitado"""
         return self.app_focus_var.get()
 
-
-
 class ControlButtonsComponent:
     """Componente de botones de control principal"""
     
     def __init__(self, parent, tr, on_toggle_callback, on_save_callback, 
-                 on_minimize_callback, on_exit_callback):
+                 on_minimize_callback, on_exit_callback): # Agregamos callbacks
         self.tr = tr
-        self.on_toggle = on_toggle_callback
         
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x", padx=20, pady=(0, 10))
         
-        # Botón principal de activar/desactivar
+        # Botón principal de activar/desactivar (Grande)
         self.toggle_btn = ttk.Button(
             self.frame,
             text=self.tr.get("activate_script_btn", "Activar Script"),
             command=on_toggle_callback,
-            bootstyle="success"
+            bootstyle="success",
+            cursor="hand2"
         )
         self.toggle_btn.pack(fill="x", pady=(0, 8), ipady=8)
         
-        # Botones secundarios
+        # Contenedor para los botones inferiores
         secondary_btns = ttk.Frame(self.frame)
         secondary_btns.pack(fill="x")
         
+        # Botón Guardar (Izquierda)
         self.btn_save = ttk.Button(
             secondary_btns,
             text=self.tr.get("save_btn", "Guardar Config"),
@@ -350,6 +346,7 @@ class ControlButtonsComponent:
         )
         self.btn_save.pack(side="left", fill="x", expand=True, padx=(0, 4))
         
+        # Botón Minimizar (Centro)
         self.btn_minimize = ttk.Button(
             secondary_btns,
             text=self.tr.get("minimize_btn", "Minimizar"),
@@ -358,11 +355,12 @@ class ControlButtonsComponent:
         )
         self.btn_minimize.pack(side="left", fill="x", expand=True, padx=(4, 4))
         
+        # Botón Salir (Derecha)
         self.btn_exit = ttk.Button(
             secondary_btns,
             text=self.tr.get("exit_btn", "Salir"),
             command=on_exit_callback,
-            bootstyle="danger-outline"
+            bootstyle="danger-info"
         )
         self.btn_exit.pack(side="left", fill="x", expand=True, padx=(4, 0))
     
@@ -379,66 +377,52 @@ class ControlButtonsComponent:
                 bootstyle="success"
             )
 
-
 class CommonKeysWindow:
     """Ventana que muestra las teclas comunes"""
     
     def __init__(self, parent, tr):
         self.tr = tr
+        self.window_manager = WindowManager() # Instancia
         
         self.window = ttk.Toplevel(parent)
         self.window.title(self.tr.get("common_keys_title", "Teclas Comunes"))
-        self.window.geometry("520x450")
+        
+        # ELIMINAMOS TAMAÑO FIJO Y LOGICA ANTIGUA DE CENTRADO
+        # w, h = 520, 450 ... self._center_window(w, h) <-- BORRAR
+        
         self.window.resizable(False, False)
         self.window.attributes('-topmost', True)
         self.window.transient(parent)
         self.window.grab_set()
         
         self._create_content()
-    
+        
+        # APLICAMOS AJUSTE AUTOMÁTICO
+        self.window_manager.center_and_resize(self.window)
+
     def _create_content(self):
-        """Crea el contenido de la ventana"""
+        # ... (El contenido de _create_content y _get_common_keys_text se mantiene IGUAL) ...
+        # Solo asegúrate de copiar el código existente de estas funciones aquí.
         main_container = ttk.Frame(self.window, padding=15)
         main_container.pack(fill="both", expand=True)
         
-        # Título
-        title = ttk.Label(
-            main_container,
-            text=self.tr.get("common_keys_desc", "Teclas más comunes para configurar:"),
-            font=("-size", 13, "-weight", "bold")
-        )
+        title = ttk.Label(main_container, text=self.tr.get("common_keys_desc", "Teclas comunes"), font=("-size", 13, "-weight", "bold"))
         title.pack(pady=(0, 15))
         
-        # Texto scrollable
         text_frame = ttk.Frame(main_container)
         text_frame.pack(fill="both", expand=True)
         
         scrollbar = ttk.Scrollbar(text_frame)
         scrollbar.pack(side="right", fill="y")
         
-        text_widget = ttk.Text(
-            text_frame,
-            yscrollcommand=scrollbar.set,
-            wrap="word",
-            font=("-family", "Consolas", "-size", 9)
-        )
+        text_widget = ttk.Text(text_frame, yscrollcommand=scrollbar.set, wrap="word", font=("-family", "Consolas", "-size", 9))
         text_widget.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=text_widget.yview)
         
-        # Contenido de teclas
-        common_keys = self._get_common_keys_text()
-        text_widget.insert("1.0", common_keys.strip())
+        text_widget.insert("1.0", self._get_common_keys_text().strip())
         text_widget.config(state="disabled")
         
-        # Botón cerrar
-        btn_close = ttk.Button(
-            main_container,
-            text=self.tr.get("close_btn", "Cerrar"),
-            command=self.window.destroy,
-            bootstyle="secondary"
-        )
-        btn_close.pack(pady=(10, 0), fill="x")
-    
+        ttk.Button(main_container, text=self.tr.get("close_btn", "Cerrar"), command=self.window.destroy, bootstyle="secondary").pack(pady=(10, 0), fill="x")
     def _get_common_keys_text(self):
         """Retorna el texto con las teclas comunes"""
         return f"""{self.tr.get("keys_letters", "Letras")}: a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z

@@ -24,13 +24,13 @@ class ConfigManager:
             if CONFIG_FILE.exists():
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                print(f"✅ Configuración cargada desde: {CONFIG_FILE}")
+                print(f"Configuración cargada desde: {CONFIG_FILE}")
                 return config
             else:
-                print("📁 No se encontró archivo de configuración, usando valores por defecto")
+                print("No se encontró archivo de configuración, usando valores por defecto")
                 return DEFAULT_CONFIG.copy()
         except Exception as e:
-            print(f"❌ Error al cargar configuración: {e}")
+            print(f"Error al cargar configuración: {e}")
             return DEFAULT_CONFIG.copy()
     
     def load_translations(self):
@@ -39,7 +39,7 @@ class ConfigManager:
             with open(LANG_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"❌ Error al cargar traducciones: {e}")
+            print(f"Error al cargar traducciones: {e}")
             return {"es": {}, "en": {}}
     
     def save_config(self, config_data):
@@ -64,10 +64,10 @@ class ConfigManager:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(current_config, f, indent=4, ensure_ascii=False)
             
-            print(f"✅ Configuración guardada en: {CONFIG_FILE}")
+            print(f"Configuración guardada en: {CONFIG_FILE}")
             return True
         except Exception as e:
-            print(f"❌ Error al guardar configuración: {e}")
+            print(f"Error al guardar configuración: {e}")
             return False
     
     def get_translation(self, key):

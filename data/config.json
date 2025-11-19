@@ -1,8 +1,6 @@
 {
-    "mode": "intercalar",
-    "key_to_replace": "alt",
-    "replacement_key": "shift",
-    "enforce_app_focus": true,
-    "target_app_name": "KeyForge",
+    "rules": [],
+    "enforce_app_focus": false,
+    "target_app_name": "",
     "lang": "en"
 }
