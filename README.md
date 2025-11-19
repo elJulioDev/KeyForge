@@ -16,8 +16,8 @@
 </p>
 
 <img src="https://img.shields.io/badge/Status-Active-success?style=flat-square" alt="Status">
-<img src="https://img.shields.io/github/stars/tuusuario/keyforge?style=flat-square" alt="Stars">
-<img src="https://img.shields.io/github/issues/tuusuario/keyforge?style=flat-square" alt="Issues">
+<img src="https://img.shields.io/github/stars/elJulioDev/keyforge?style=flat-square" alt="Stars">
+<img src="https://img.shields.io/github/issues/elJulioDev/keyforge?style=flat-square" alt="Issues">
 
 </div>
 
