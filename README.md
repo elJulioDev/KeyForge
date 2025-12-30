@@ -4,7 +4,7 @@ This project is a modern and robust desktop tool developed in Python for real-ti
 
 It is designed with a modular architecture that separates the key interception logic (low-level Hooks) from the user interface, ensuring optimal performance with no input lag, ideal for productivity workflows or gaming.
 
-## 🚀 Main Features
+## Main Features
 * **Hybrid Remapping Engine:**
     * **Hold Mode:** The remapped key remains physically pressed while the user holds down the original key.
     * **Toggle Mode:** Converts any key into a switch (On/Off), ideal for automating held actions without physical effort.
@@ -20,7 +20,7 @@ It is designed with a modular architecture that separates the key interception l
     * Automatic configuration saving system in JSON.
     * Multi-language support (Spanish/English) with dynamic loading from `lang.json`.
 
-## 🛠️ Technologies Used
+## Technologies Used
 The project uses a stack focused on operating system integration and user experience:
 * **Language:** Python 3.8+
 * **GUI Framework:** `ttkbootstrap` (Modern wrapper for Tkinter).
@@ -30,13 +30,13 @@ The project uses a stack focused on operating system integration and user experi
     * `ctypes` (WinAPI): For deep integration with Windows events.
 * **Packaging:** Structure prepared for compilation with `PyInstaller` (relative path support with `sys._MEIPASS`).
 
-## 📋 Prerequisites
+## Prerequisites
 Ensure you have the following installed and configured:
 * Python 3.8 or higher
 * Administrator Privileges (Required for the `keyboard` library to intercept system events).
 * Windows Operating System (Recommended for full window detection support).
 
-## 🔧 Installation and Configuration
+## Installation and Configuration
 Follow these steps to set up the project in your local environment:
 
 1. **Clone the repository:**
@@ -65,7 +65,7 @@ pip install -r requirements.txt
  python KeyForge.py
 ```
 
-## 🔐 System Usage
+## System Usage
 1. **Rule Management**
     * In the "Rules" tab, click "Add".
     * Use the "🔍 Detect" button to capture the physical key you want to replace and the target key.
@@ -79,7 +79,7 @@ pip install -r requirements.txt
     * The icon changes color (Gray -> Neon Green) to indicate if the script is actively intercepting keys.
     * Double-click the widget to restore the main window.
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 keyforge/
@@ -105,8 +105,8 @@ keyforge/
 ├── requirements.txt                # Project dependencies
 ```
 
-## 👥 Credits
+## Credits
 Developed by Alexis González as an advanced solution for peripheral customization and accessibility in Windows environments.
 
-## 📄 License
+## License
 This project is open source and is distributed under the MIT license.
