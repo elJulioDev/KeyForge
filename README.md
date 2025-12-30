@@ -66,15 +66,15 @@ pip install -r requirements.txt
 ```
 
 ## 🔐 System Usage
-**1. Rule Management**
+1. **Rule Management**
     * In the "Rules" tab, click "Add".
     * Use the "🔍 Detect" button to capture the physical key you want to replace and the target key.
     * Select the mode (Hold for normal behavior, Toggle for switch).
-**2. Target App Configuration**
+2. **Target App Configuration**
     * In the Dashboard, enable "Focus on specific application".
     * Select the desired process from the dropdown list (eg: `notepad.exe`).
     * KeyForge will only intercept keys when that window is active.
-**3. Widget Mode**
+3. **Widget Mode**
     * Click the "Minimize" button. The main window will hide, and a small floating icon will appear.
     * The icon changes color (Gray -> Neon Green) to indicate if the script is actively intercepting keys.
     * Double-click the widget to restore the main window.
