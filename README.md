@@ -1,50 +1,51 @@
-# KeyForge - Remapeo de Teclas Avanzado y Contextual
-Este proyecto es una herramienta de escritorio moderna y robusta desarrollada en Python para la gestión y remapeo de teclas en tiempo real. A diferencia de scripts sencillos de remapeo, KeyForge ofrece una interfaz gráfica profesional (GUI) y un motor de detección de contexto inteligente, permitiendo que las reglas de teclado se apliquen globalmente o únicamente cuando una aplicación específica está en primer plano.
+# KeyForge - Advanced Contextual Key Remapping
 
-Está diseñado con una arquitectura modular que separa la lógica de intercepción de teclas (Hooks de bajo nivel) de la interfaz de usuario, garantizando un rendimiento óptimo sin input lag, ideal para flujos de trabajo de productividad o gaming.
+This project is a modern and robust desktop tool developed in Python for real-time key management and remapping. Unlike simple remapping scripts, **KeyForge** offers a professional graphical interface (GUI) and an intelligent context detection engine, allowing keyboard rules to apply globally or only when a specific application is in the foreground.
 
-## 🚀 Características Principales
-* **Motor de Remapeo Híbrido:**
-    * **Modo Hold:** La tecla reasignada se mantiene presionada físicamente mientras el usuario sostiene la tecla original.
-    * **Modo Toggle:** Convierte cualquier tecla en un interruptor (On/Off), ideal para automatizar acciones mantenidas sin esfuerzo físico.
-    * **Prevención de Recursión:** Algoritmo interno que evita bucles infinitos si se cruzan reglas (ej: A->B y B->A).
-* **Enfoque Inteligente (Smart Focus):**
-    * **Detección Contextual:** Permite vincular perfiles de teclas a una ventana específica (ej. "Minecraft", "Photoshop"). Si cambias de ventana, el script se pausa automáticamente.
-    * **WinEventHook (Optimización):** En Windows, utiliza la API de bajo nivel (`user32.dll`) para detectar cambios de foco por eventos en lugar de polling constante, reduciendo el uso de CPU a casi cero.
-* **Interfaz Moderna y Funcional:**
-    * **Diseño Dark Mode:** Construido con `ttkbootstrap` para una estética limpia y profesional.
-    * **Widget Flotante (Mini-Mode):** Capacidad de minimizar la app a un widget flotante semitransparente que indica visualmente el estado del script (Activo/Inactivo) sin estorbar.
-    * **Gestor de Reglas CRUD:** Tabla interactiva para agregar, editar y eliminar múltiples reglas de remapeo simultáneamente.
-* **Persistencia y Localización:**
-    * Sistema de guardado automático de configuraciones en JSON.
-    * Soporte multi-idioma (Español/Inglés) con carga dinámica desde `lang.json`.
+It is designed with a modular architecture that separates the key interception logic (low-level Hooks) from the user interface, ensuring optimal performance with no input lag, ideal for productivity workflows or gaming.
 
-## 🛠️ Tecnologías Utilizadas
-El proyecto utiliza un stack enfocado en la integración con el sistema operativo y la experiencia de usuario:
-* Lenguaje: Python 3.8+
-* GUI Framework: `ttkbootstrap` (Wrapper moderno para Tkinter).
-* Core Logic:
-    * `keyboard`: Para la instalación de hooks globales de teclado.
-    * `pygetwindow`: Para la gestión y detección de ventanas activas.
-    * `ctypes` (WinAPI): Para la integración profunda con eventos de Windows.
-* Empaquetado: Estructura preparada para compilación con `PyInstaller` (soporte de rutas relativas con `sys._MEIPASS`).
+## 🚀 Main Features
+* **Hybrid Remapping Engine:**
+    * **Hold Mode:** The remapped key remains physically pressed while the user holds down the original key.
+    * **Toggle Mode:** Converts any key into a switch (On/Off), ideal for automating held actions without physical effort.
+    * **Recursion Prevention:** Internal algorithm that prevents infinite loops if rules intersect (e.g., A->B and B->A).
+* **Smart Focus:**
+    * **Contextual Detection:** Allows linking key profiles to a specific window (e.g., "Minecraft", "Photoshop"). If you switch windows, the script pauses automatically.
+    * **WinEventHook (Optimization):** On Windows, it uses the low-level API (`user32.dll`) to detect focus changes via events instead of constant polling, reducing CPU usage to nearly zero.
+* **Modern and Functional Interface:**
+    * **Dark Mode Design:** Built with `ttkbootstrap` for a clean and professional aesthetic.
+    * **Floating Widget (Mini-Mode):** Ability to minimize the app to a semi-transparent floating widget that visually indicates the script status (Active/Inactive) without being intrusive.
+    * **CRUD Rule Manager:** Interactive table to add, edit, and delete multiple remapping rules simultaneously.
+* **Persistence and Localization:**
+    * Automatic configuration saving system in JSON.
+    * Multi-language support (Spanish/English) with dynamic loading from `lang.json`.
 
-## 📋 Pre-requisitos
-Asegúrate de tener instalado y configurado lo siguiente:
-* Python 3.8 o superior
-* Permisos de Administrador (Necesario para que la librería `keyboard` intercepte eventos del sistema).
-* Sistema Operativo Windows (Recomendado para el soporte completo de detección de ventanas).
+## 🛠️ Technologies Used
+The project uses a stack focused on operating system integration and user experience:
+* **Language:** Python 3.8+
+* **GUI Framework:** `ttkbootstrap` (Modern wrapper for Tkinter).
+* **Core Logic:**
+    * `keyboard`: For installing global keyboard hooks.
+    * `pygetwindow`: For active window management and detection.
+    * `ctypes` (WinAPI): For deep integration with Windows events.
+* **Packaging:** Structure prepared for compilation with `PyInstaller` (relative path support with `sys._MEIPASS`).
 
-## 🔧 Instalación y Configuración
-Sigue estos pasos para levantar el proyecto en tu entorno local:
+## 📋 Prerequisites
+Ensure you have the following installed and configured:
+* Python 3.8 or higher
+* Administrator Privileges (Required for the `keyboard` library to intercept system events).
+* Windows Operating System (Recommended for full window detection support).
 
-1. Clonar el repositorio:
+## 🔧 Installation and Configuration
+Follow these steps to set up the project in your local environment:
+
+1. **Clone the repository:**
 ```bash
-git clone https://github.com/elJulioDev/keyforge.git
+git clone [https://github.com/elJulioDev/keyforge.git](https://github.com/elJulioDev/keyforge.git)
 cd keyforge
 ```
 
-2. Crear y activar un entorno virtual:
+2. **Create and activate a virtual environment:**
 ```bash
 python -m venv venv
 # En Windows:
@@ -53,59 +54,59 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-3. Instalar dependencias:
+3. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Ejecutar la aplicación:
-**Nota:** Es crucial ejecutar la terminal como Administrador para que los hooks de teclado funcionen correctamente.
+4. **Run the application:**
+**Note:** It is crucial to run the terminal as Administrator for the keyboard hooks to work correctly.
 ```bash
  python KeyForge.py
 ```
 
-## 🔐 Uso del Sistema
-**1. Gestión de Reglas**
-    * En la pestaña "Rules", pulsa "Add".
-    * Usa el botón "🔍 Detect" para capturar la tecla física que deseas reemplazar y la tecla destino.
-    * Selecciona el modo (Hold para comportamiento normal, Toggle para interruptor).
-**2. Configuración de Objetivo (Target App)**
-    * En el Dashboard, activa "Enfoque en aplicación específica".
-    * Selecciona el proceso deseado de la lista desplegable (ej: `notepad.exe`).
-    * KeyForge solo interceptará las teclas cuando esa ventana esté activa.
-**3. Modo Widget**
-    * Pulsa el botón "Minimizar". La ventana principal se ocultará y aparecerá un pequeño icono flotante.
-    * El icono cambia de color (Gris -> Verde Neón) para indicar si el script está interceptando teclas activamente.
-    * Doble clic en el widget para restaurar la ventana principal.
+## 🔐 System Usage
+**1. Rule Management**
+    * In the "Rules" tab, click "Add".
+    * Use the "🔍 Detect" button to capture the physical key you want to replace and the target key.
+    * Select the mode (Hold for normal behavior, Toggle for switch).
+**2. Target App Configuration**
+    * In the Dashboard, enable "Focus on specific application".
+    * Select the desired process from the dropdown list (eg: `notepad.exe`).
+    * KeyForge will only intercept keys when that window is active.
+**3. Widget Mode**
+    * Click the "Minimize" button. The main window will hide, and a small floating icon will appear.
+    * The icon changes color (Gray -> Neon Green) to indicate if the script is actively intercepting keys.
+    * Double-click the widget to restore the main window.
 
-## 📂 Estructura del Proyecto
+## 📂 Project Structure
 
 ```text
 keyforge/
-├── data/                           # Archivos de datos externos
-│   ├── config.json                 # Persistencia de reglas y opciones
-│   └── lang.json                   # Archivo de traducción (ES/EN)
-├── src/                            # Código fuente modular
-│   ├── config/                     # Gestores de configuración y constantes
+├── data/                           # External data files
+│   ├── config.json                 # Rule persistence and options
+│   └── lang.json                   # Translation file (ES/EN)
+├── src/                            # Modular source code
+│   ├── config/                     # Configuration managers and constants
 │   │   ├── config_manager.py
 │   │   └── constants.py
-│   ├── core/                       # Lógica de negocio (Backend)
-│   │   ├── app_monitor.py          # Detección de ventanas (Polling/Hooks)
-│   │   ├── key_handler.py          # Lógica de remapeo y prevención de ciclos
-│   │   └── window_event_monitor.py # Wrapper de ctypes para WinAPI
-│   ├── gui/                        # Interfaz Gráfica (Frontend)
-│   │   ├── components.py           # Widgets reutilizables (Status, Buttons)
-│   │   ├── main_window.py          # Ventana principal y orquestador
-│   │   ├── minimized_window.py     # Widget flotante (Canvas drawing)
-│   │   └── rules_manager.py        # Tabla de gestión de reglas (Treeview)
-│   └── utils/                      # Utilidades generales
-│       └── window_manager.py       # Centrado y arrastre de ventanas
-├── KeyForge.py                     # Punto de entrada (Entry Point)
-├── requirements.txt                # Dependencias del proyecto
+│   ├── core/                       # Business logic (Backend)
+│   │   ├── app_monitor.py          # Window detection (Polling/Hooks)
+│   │   ├── key_handler.py          # Remapping logic and cycle prevention
+│   │   └── window_event_monitor.py # ctypes wrapper for WinAPI
+│   ├── gui/                        # Graphical Interface (Frontend)
+│   │   ├── components.py           # Reusable widgets (Status, Buttons)
+│   │   ├── main_window.py          # Main window and orchestrator
+│   │   ├── minimized_window.py     # Floating widget (Canvas drawing)
+│   │   └── rules_manager.py        # Rule management table (Treeview)
+│   └── utils/                      # General utilities
+│       └── window_manager.py       # Window centering and dragging
+├── KeyForge.py                     # Entry Point
+├── requirements.txt                # Project dependencies
 ```
 
-## 👥 Créditos
-Desarrollado por Alexis González como una solución avanzada para la personalización de periféricos y accesibilidad en entornos Windows.
+## 👥 Credits
+Developed by Alexis González as an advanced solution for peripheral customization and accessibility in Windows environments.
 
-## 📄 Licencia
-Este proyecto es de código abierto y se distribuye bajo la licencia MIT.
+## 📄 License
+This project is open source and is distributed under the MIT license.
