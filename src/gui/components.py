@@ -75,7 +75,7 @@ class KeyConfigComponent:
         self.replacement_key_var = StringVar(value="shift")
         
         # Frame principal
-        self.frame = ttk.LabelFrame(
+        self.frame = ttk.Labelframe(
             parent,
             text=self.tr.get("key_config_title", "Configuración de Teclas"),
             padding=12
@@ -175,7 +175,7 @@ class ModeComponent:
         self.tr = tr
         self.mode_var = StringVar(value="mantener")
         
-        self.frame = ttk.LabelFrame(
+        self.frame = ttk.Labelframe(
             parent,
             text=self.tr.get("mode_title", "Modo de Operación"),
             padding=12
@@ -222,7 +222,7 @@ class AppFocusComponent:
         self.app_focus_var = BooleanVar(value=True)
         
         # Frame principal con título (LabelFrame)
-        self.frame = ttk.LabelFrame(
+        self.frame = ttk.Labelframe(
             parent,
             text=tr.get("target_app_title", "Aplicación Objetivo"),
             padding=12

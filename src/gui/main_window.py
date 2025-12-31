@@ -311,15 +311,54 @@ class KeyForgeApp:
             return
         
         self.root.withdraw()
-        self.minimized_window = MinimizedWindow(self.root, self._restore_window)
         
-        # CAMBIO AQUÍ: Obtenemos el estado real del key_handler
+        # MODIFICADO: Pasamos self._toggle_script como tercer argumento
+        self.minimized_window = MinimizedWindow(
+            self.root, 
+            self._restore_window,
+            self._toggle_script 
+        )
+        
         is_script_active = self.key_handler.is_active()
-        
-        # Pasamos el estado al mostrar la ventana
         self.minimized_window.show(is_active=is_script_active)
         
         self.is_minimized = True
+
+    def _toggle_script(self):
+        # Lógica original para detener
+        if self.key_handler.is_active():
+            self.key_handler.stop()
+            self.status_component.update_script_status(False)
+            self.control_buttons.set_toggle_state(False)
+            self.rules_manager.set_controls_state(True)
+            self.app_focus_component.set_controls_state(True)
+        else:
+            # Lógica original para iniciar
+            if not self.key_handler.get_rules():
+                # Si está minimizado y da error, mostramos un popup simple porque la ventana principal no se ve
+                if self.is_minimized:
+                    messagebox.showwarning("KeyForge", "Add at least one rule first.")
+                else:
+                    messagebox.showwarning("KeyForge", "Add at least one rule first.")
+                return
+            
+            self.app_monitor.set_enforce_focus(self.app_focus_component.is_focus_enabled())
+            self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
+            
+            success, error = self.key_handler.start()
+            if success:
+                self.status_component.update_script_status(True, len(self.key_handler.get_rules()))
+                self.control_buttons.set_toggle_state(True)
+                self.rules_manager.set_controls_state(False)
+                self.app_focus_component.set_controls_state(False)
+            else:
+                messagebox.showerror("Error", error)
+
+        # NUEVO: Actualizar el icono minimizado si está visible
+        if self.is_minimized and self.minimized_window:
+            # Obtenemos el nuevo estado directamente del handler
+            new_state = self.key_handler.is_active()
+            self.minimized_window.update_visuals(new_state)
 
     def _restore_window(self):
         if self.minimized_window: self.minimized_window.hide()

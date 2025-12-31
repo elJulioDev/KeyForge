@@ -8,11 +8,14 @@ from ..utils.window_manager import WindowManager
 class MinimizedWindow:
     """Ventana flotante minimalista para estado minimizado"""
     
-    def __init__(self, parent, on_restore_callback):
+    def __init__(self, parent, on_restore_callback, on_toggle_callback):
         self.parent = parent
         self.on_restore = on_restore_callback
+        self.on_toggle = on_toggle_callback  # Guardamos la función toggle
         self.window = None
         self.window_manager = WindowManager()
+        self.canvas = None # Referencia al canvas para redibujar
+        self.size = 90     # Tamaño guardado
     
     # 1. MODIFICAMOS show PARA ACEPTAR EL ESTADO
     def show(self, is_active=False):
@@ -39,25 +42,31 @@ class MinimizedWindow:
         self.window.geometry(f"{size}x{size}+{x_pos}+{y_pos}")
         self.window.configure(background='#0f0f0f')
         
-        # Canvas para el diseño gráfico
-        canvas = ttk.Canvas(
+        # 2. Guardamos el canvas como self.canvas
+        self.canvas = ttk.Canvas(
             self.window,
-            width=size,
-            height=size,
+            width=self.size,
+            height=self.size,
             highlightthickness=0,
             bg="#0f0f0f"
         )
-        canvas.pack(fill="both", expand=True)
+        self.canvas.pack(fill="both", expand=True)
         
         # 2. PASAMOS EL ESTADO AL DIBUJADO
-        self._draw_pro_icon(canvas, size, is_active)
+        self._draw_pro_icon(self.canvas, size, is_active)
         
         # Eventos
-        self._bind_events(canvas)
+        self._bind_events(self.canvas)
         
         # Animación de entrada
         self._fade_in()
     
+    def update_visuals(self, is_active):
+        """Redibuja el icono según el nuevo estado (Activo/Inactivo)"""
+        if self.canvas:
+            self.canvas.delete("all") # Limpia el dibujo anterior
+            self._draw_pro_icon(self.canvas, self.size, is_active)
+
     def _draw_pro_icon(self, canvas, s, is_active):
         """
         Dibuja un icono moderno. 
@@ -132,10 +141,11 @@ class MinimizedWindow:
         widget.bind("<ButtonPress-1>", lambda e: self.window_manager.start_drag(e, self.window))
         widget.bind("<B1-Motion>", lambda e: self.window_manager.drag(e, self.window))
         widget.bind("<ButtonRelease-1>", self._on_release)
-        
+        widget.bind("<Button-3>", lambda e: self.on_toggle())
         def on_enter(e):
             self.window.attributes('-alpha', 1.0)
             widget.config(cursor="hand2")
+            
             
         def on_leave(e):
             self.window.attributes('-alpha', 0.9)
@@ -161,6 +171,7 @@ class MinimizedWindow:
         if self.window:
             self.window.destroy()
             self.window = None
+            self.canvas = None
     
     def is_visible(self):
         return self.window is not None
