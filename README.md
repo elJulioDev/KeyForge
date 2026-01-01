@@ -9,9 +9,14 @@ It is designed with a modular architecture that separates the key interception l
     * **Hold Mode:** The remapped key remains physically pressed while the user holds down the original key.
     * **Toggle Mode:** Converts any key into a switch (On/Off), ideal for automating held actions without physical effort.
     * **Recursion Prevention:** Internal algorithm that prevents infinite loops if rules intersect (e.g., A->B and B->A).
+
 * **Smart Focus:**
     * **Contextual Detection:** Allows linking key profiles to a specific window (e.g., "Minecraft", "Photoshop"). If you switch windows, the script pauses automatically.
     * **WinEventHook (Optimization):** On Windows, it uses the low-level API (`user32.dll`) to detect focus changes via events instead of constant polling, reducing CPU usage to nearly zero.
+* **Personalization & Accessibility Hub (New in v1.3.2):**
+    * **Theme Selector:** Instantly switch between multiple visual styles, including Light (Cosmo, Flatly, Yeti) and Dark (Darkly, Cyborg, Vapor) themes to match your system or preference.
+    * **Language Switcher:** Change interface language (English/Spanish) directly from the GUI.
+    * **Auto-Restart System:** The application intelligently restarts itself to apply visual and language changes seamlessly.
 * **Modern and Functional Interface:**
     * **Dark Mode Design:** Built with `ttkbootstrap` for a clean and professional aesthetic.
     * **Floating Widget (Mini-Mode):** Ability to minimize the app to a semi-transparent floating widget that visually indicates the script status (Active/Inactive) without being intrusive.
@@ -74,7 +79,11 @@ pip install -r requirements.txt
     * In the Dashboard, enable "Focus on specific application".
     * Select the desired process from the dropdown list (eg: `notepad.exe`).
     * KeyForge will only intercept keys when that window is active.
-3. **Widget Mode**
+3. **Personalization**
+    * Navigate to the **"Accessibility"** tab.
+    * Select your preferred language or choose a new visual theme from the list.
+    * The application will automatically restart to apply the new settings.
+4. **Widget Mode**
     * Click the "Minimize" button. The main window will hide, and a small floating icon will appear.
     * The icon changes color (Gray -> Neon Green) to indicate if the script is actively intercepting keys.
     * Double-click the widget to restore the main window.
@@ -83,30 +92,29 @@ pip install -r requirements.txt
 
 ```text
 keyforge/
-├── data/                           # External data files
-│   ├── config.json                 # Rule persistence and options
-│   └── lang.json                   # Translation file (ES/EN)
-├── src/                            # Modular source code
-│   ├── config/                     # Configuration managers and constants
+├── data/                               # External data files
+│   ├── config.json                     # Rule persistence and options
+│   └── lang.json                       # Translation file (ES/EN)
+├── src/                                # Modular source code
+│   ├── config/                         # Configuration managers and constants
 │   │   ├── config_manager.py
 │   │   └── constants.py
-│   ├── core/                       # Business logic (Backend)
-│   │   ├── app_monitor.py          # Window detection (Polling/Hooks)
-│   │   ├── key_handler.py          # Remapping logic and cycle prevention
-│   │   └── window_event_monitor.py # ctypes wrapper for WinAPI
-│   ├── gui/                        # Graphical Interface (Frontend)
-│   │   ├── components.py           # Reusable widgets (Status, Buttons)
-│   │   ├── main_window.py          # Main window and orchestrator
-│   │   ├── minimized_window.py     # Floating widget (Canvas drawing)
-│   │   └── rules_manager.py        # Rule management table (Treeview)
-│   └── utils/                      # General utilities
-│       └── window_manager.py       # Window centering and dragging
-├── KeyForge.py                     # Entry Point
-├── requirements.txt                # Project dependencies
+│   ├── core/                           # Business logic (Backend)
+│   │   ├── app_monitor.py              # Window detection (Polling/Hooks)
+│   │   ├── key_handler.py              # Remapping logic and cycle prevention
+│   │   └── window_event_monitor.py     # ctypes wrapper for WinAPI
+│   ├── gui/                            # Graphical Interface (Frontend)
+│   │   ├── accessibility_settings.py   # Language & Theme configuration
+│   │   ├── components.py               # Reusable widgets (Status, Buttons)
+│   │   ├── main_window.py              # Main window and orchestrator
+│   │   ├── minimized_window.py         # Floating widget (Canvas drawing)
+│   │   └── rules_manager.py            # Rule management table (Treeview)
+│   └── utils/                          # General utilities
+│       └── window_manager.py           # Window centering and dragging
+├── KeyForge.py                         # Entry Point
+├── requirements.txt                    # Project dependencies
+└── README.md                           # Documentation
 ```
-
-## Credits
-Developed by Alexis González as an advanced solution for peripheral customization and accessibility in Windows environments.
 
 ## License
 This project is open source and is distributed under the MIT license.
