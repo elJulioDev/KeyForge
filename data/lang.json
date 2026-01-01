@@ -66,7 +66,16 @@
     "error_invalid_index": "Índice de regla inválido",
     "error_admin_required": "Se requieren permisos de Administrador para capturar teclas",
     "error_hook_active": "El script ya está activo",
-    "error_unexpected": "Error inesperado: {e}"
+    "error_unexpected": "Error inesperado: {e}",
+    "accessibility_title": "♿ Accesibilidad",
+    "language_label": "Idioma:",
+    "theme_label": "Tema:",
+    "spanish": "Español",
+    "english": "Inglés",
+    "theme_darkly": "Oscuro",
+    "theme_superhero": "Superhéroe",
+    "settings_saved": "Configuración guardada. Reiniciando interfaz...",
+    "accessibility_info": "⚠️ La aplicación se reiniciará para aplicar los cambios"
   },
   "en": {
     "title": "KeyForge",
@@ -135,6 +144,13 @@
     "error_invalid_index": "Invalid rule index",
     "error_admin_required": "Administrator privileges required to capture keys",
     "error_hook_active": "Script is already active",
-    "error_unexpected": "Unexpected error: {e}"
+    "error_unexpected": "Error inesperado: {e}",
+    "accessibility_title": "♿ Accessibility",
+    "language_label": "Language:",
+    "theme_label": "Theme:",
+    "spanish": "Spanish",
+    "english": "English",
+    "settings_saved": "Settings saved. Restarting interface...",
+    "accessibility_info": "⚠️ The application will restart to apply changes"
   }
 }

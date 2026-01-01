@@ -3,7 +3,7 @@ Ventana principal de la aplicación KeyForge - Diseño Tabulado
 """
 import ttkbootstrap as ttk
 from tkinter import messagebox
-import sys
+import sys, os
 from ..config import ConfigManager
 from ..core import KeyHandler, AppMonitor
 from ..utils import WindowManager
@@ -14,7 +14,7 @@ from .components import (
 )
 from .rules_manager import RulesManagerComponent
 from .minimized_window import MinimizedWindow
-
+from .accessibility_settings import AccessibilityComponent
 
 class KeyForgeApp:
     def __init__(self):
@@ -26,6 +26,7 @@ class KeyForgeApp:
         self.is_minimized = False
         self.minimized_window = None
         self.drag_data = {"x": 0, "y": 0}
+        self.is_restarting = False
         
         self._create_window()
         self.key_handler.set_tk_root(self.root)
@@ -37,7 +38,8 @@ class KeyForgeApp:
         self._init_monitoring()
 
     def _create_window(self):
-        self.root = ttk.Window(themename="darkly")
+        current_theme = self.config_manager.config.get("theme", "darkly")
+        self.root = ttk.Window(themename=current_theme)
         self.root.overrideredirect(True)
         self.root.title("KeyForge")
         self.root.resizable(False, False)
@@ -77,7 +79,7 @@ class KeyForgeApp:
         # Título (sin botones de ventana)
         from .. import __version__
         title = ttk.Label(header, text=f"🔧 KeyForge v{__version__}", font=("Segoe UI", 12, "bold"), bootstyle="inverse-secondary")
-        title.pack(side="left", padx=15) # Alineado a la izquierda
+        title.pack(side="left", padx=15)
 
         # Arrastre (Vinculado al header y al título)
         for w in [header, title]:
@@ -95,6 +97,10 @@ class KeyForgeApp:
         # Pestaña 2: Reglas
         self.tab_rules = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(self.tab_rules, text=f" {tr.get('rules_title', 'Rules')} ")
+        
+        # Pestaña 3: Accesibilidad
+        self.tab_accessibility = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(self.tab_accessibility, text=f" {tr.get('accessibility_title', 'Accessibility')} ")
 
         # --- CONTENIDO DASHBOARD ---
         self.status_component = StatusComponent(self.tab_dashboard, tr)
@@ -108,14 +114,13 @@ class KeyForgeApp:
         
         ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
 
-        # MODIFICADO: Pasamos los 4 callbacks necesarios
         self.control_buttons = ControlButtonsComponent(
             self.tab_dashboard, 
             tr,
             on_toggle_callback=self._toggle_script, 
             on_save_callback=self._save_config,
-            on_minimize_callback=self._minimize_custom, # Callback Minimizar
-            on_exit_callback=self._on_close           # Callback Salir
+            on_minimize_callback=self._minimize_custom,
+            on_exit_callback=self._on_close
         )
 
         # --- CONTENIDO REGLAS ---
@@ -127,6 +132,18 @@ class KeyForgeApp:
         self.rules_manager.on_add_rule = self._add_rule_logic
         self.rules_manager.on_edit_rule = self._edit_rule_logic
         self.rules_manager.on_delete_rule = self._delete_rule_logic
+        
+        # --- CONTENIDO ACCESIBILIDAD ---
+        current_lang = self.config_manager.config.get("lang", "en")
+        current_theme = self.config_manager.config.get("theme", "darkly")
+        
+        self.accessibility_component = AccessibilityComponent(
+            self.tab_accessibility,
+            tr,
+            current_lang,
+            current_theme,
+            self._on_accessibility_change
+        )
 
     # --- Lógica de Reglas ---
     
@@ -274,7 +291,84 @@ class KeyForgeApp:
             self.app_monitor.target_app_is_active, 
             self.app_monitor.target_app_name
         )
-        self.root.after(500, self._start_polling_monitoring)
+        self._polling_id = self.root.after(500, self._start_polling_monitoring)
+
+    # --- Accesibilidad ---
+    
+    def _on_accessibility_change(self, setting_type, value):
+        """
+        Callback cuando cambia alguna configuración de accesibilidad.
+        Guarda automáticamente y reinicia la interfaz.
+        """
+        if hasattr(self, 'is_restarting') and self.is_restarting:
+            return
+        
+        # Guardar el nuevo valor en la configuración
+        config_update = {setting_type: value}
+        
+        # Preservar configuración existente
+        config_update["rules"] = [rule.to_dict() for rule in self.key_handler.get_rules()]
+        config_update["enforce_app_focus"] = self.app_focus_component.is_focus_enabled()
+        config_update["target_app_name"] = self.app_focus_component.get_app_name()
+        
+        # Actualizar el valor que cambió
+        if setting_type == "lang":
+            config_update["theme"] = self.config_manager.config.get("theme", "darkly")
+        else:  # theme
+            config_update["lang"] = self.config_manager.config.get("lang", "en")
+        
+        # Guardar configuración
+        if self.config_manager.save_config(config_update):
+            # Reiniciar la aplicación para aplicar cambios
+            self._restart_application()
+    
+    def _restart_application(self):
+        """Reinicia el proceso de la aplicación completamente"""
+        if self.is_restarting:
+            return
+
+        self.is_restarting = True
+
+        # 1. Guardar estado y detener hilos
+        try:
+            if self.key_handler.is_active():
+                self.key_handler.stop()
+            self._stop_all_monitoring()
+        except Exception as e:
+            print(f"Error limpiando antes de reiniciar: {e}")
+
+        # 2. Destruir la ventana actual
+        try:
+            self.root.destroy()
+        except:
+            pass
+
+        # 3. REINICIO ROBUSTO DEL PROCESO
+        # Esto detecta si estás corriendo en Python normal o en un .exe compilado
+        print("Reiniciando aplicación...")
+        if getattr(sys, 'frozen', False):
+             # Si es un ejecutable (PyInstaller)
+            os.execl(sys.executable, sys.executable, *sys.argv)
+        else:
+            # Si es un script de Python (.py)
+            os.execl(sys.executable, sys.executable, *sys.argv)
+
+    def _stop_all_monitoring(self):
+        """Detiene todos los sistemas de monitoreo activos"""
+        try:
+            # Detener polling si existe
+            if hasattr(self, '_polling_id'):
+                self.root.after_cancel(self._polling_id)
+                self._polling_id = None
+        except:
+            pass
+    
+        try:
+            # Detener event monitoring
+            if hasattr(self.app_monitor, 'stop_event_monitoring'):
+                self.app_monitor.stop_event_monitoring()
+        except:
+            pass
 
     # --- Window Utilities ---
     def _refresh_windows_list(self):
