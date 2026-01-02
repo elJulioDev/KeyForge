@@ -53,7 +53,7 @@ class AccessibilityComponent:
         # Título
         title = ttk.Label(
             self.frame,
-            text=self.tr.get("accessibility_title", "♿ Accessibility"),
+            text=self.tr.get("accessibility_title", "Accessibility"),
             font=("-size", 14, "-weight", "bold")
         )
         title.pack(pady=(0, 20))

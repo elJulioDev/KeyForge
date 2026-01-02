@@ -21,20 +21,16 @@ class AppMonitor:
         self.enforce_app_focus = enforce
     
     def is_target_app_active(self):
-        """
-        Verifica si la ventana activa coincide con la aplicación objetivo.
-        Si enforce_app_focus es False, siempre retorna True (funciona globalmente).
-        """
         if not self.enforce_app_focus:
             return True
-        
         try:
+            # Importación diferida
+            import pygetwindow as gw
             active_window = gw.getActiveWindow()
             if active_window and self.target_app_name.lower() in active_window.title.lower():
                 return True
         except Exception:
             pass
-        
         return False
     
     def update_status(self):
@@ -44,8 +40,9 @@ class AppMonitor:
     
     @staticmethod
     def get_all_windows():
-        """Obtiene lista de todas las ventanas abiertas"""
         try:
+            # Importación diferida (esta función es la más lenta)
+            import pygetwindow as gw
             all_windows = gw.getAllTitles()
             # Filtrar ventanas vacías y duplicados
             unique_windows = []

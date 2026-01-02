@@ -1,65 +1,48 @@
 """
 Constantes y configuraciones globales del proyecto
 """
-
 import sys
 from pathlib import Path
 
 def get_base_path():
-    """
-    Obtiene la ruta base del proyecto, compatible con PyInstaller.
-    
-    Cuando el código se ejecuta normalmente, usa __file__.
-    Cuando está empaquetado con PyInstaller, usa sys._MEIPASS.
-    """
+    """Ruta de los archivos internos (Solo LECTURA: código, lang.json, imágenes)"""
     if getattr(sys, 'frozen', False):
-        # El código está siendo ejecutado como un ejecutable de PyInstaller
-        # sys._MEIPASS apunta a la carpeta temporal donde PyInstaller extrae los archivos
-        base_path = Path(sys._MEIPASS)
-    else:
-        # El código está siendo ejecutado como un script de Python normal
-        base_path = Path(__file__).parent.parent.parent
-    
-    return base_path
+        return Path(sys._MEIPASS)
+    return Path(__file__).parent.parent.parent
 
-
-def get_data_path():
-    """
-    Obtiene la ruta de la carpeta 'data', compatible con PyInstaller.
-    
-    En modo de desarrollo: usa la carpeta data del proyecto.
-    En modo empaquetado: usa una carpeta en el directorio del usuario.
-    """
+def get_config_path():
+    """Ruta para guardar configuración (ESCRITURA: config.json)"""
     if getattr(sys, 'frozen', False):
-        # Cuando está empaquetado, guardar data en una ubicación permanente
-        # (no en _MEIPASS que es temporal)
-        if sys.platform == 'win32':
-            # Windows: usar AppData
-            app_data = Path.home() / 'AppData' / 'Local' / 'KeyForge'
-        else:
-            # Linux/Mac: usar .config
-            app_data = Path.home() / '.config' / 'KeyForge'
+        # Opción A: Verdaderamente Portable (guardar al lado del .exe)
+        # Si llevas el .exe en un USB, la config viaja con él.
+        config_dir = Path(sys.executable).parent / "data"
         
-        app_data.mkdir(parents=True, exist_ok=True)
-        return app_data
+        # Opción B: Si prefieres usar AppData (menos portable, más limpio)
+        # config_dir = Path.home() / 'AppData' / 'Local' / 'KeyForge'
+        
+        config_dir.mkdir(parents=True, exist_ok=True)
+        return config_dir
     else:
-        # En desarrollo, usar la carpeta data del proyecto
-        return BASE_DIR / "data"
-
+        return Path(__file__).parent.parent.parent / "data"
 
 # --- Configuración de Rutas ---
-BASE_DIR = get_base_path()
-DATA_DIR = get_data_path()
-LANG_FILE = DATA_DIR / "lang.json"
-CONFIG_FILE = DATA_DIR / "config.json"
+BASE_DIR = get_base_path()      # Donde están los archivos del programa
+CONFIG_DIR = get_config_path()  # Donde guardamos la configuración
 
-# Crear carpeta data si no existe
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+# LANG_FILE se lee de los recursos internos (dentro del exe)
+LANG_FILE = BASE_DIR / "data" / "lang.json" 
 
-# --- Configuración por Defecto Actualizada ---
+# CONFIG_FILE se guarda en la carpeta externa (fuera del exe)
+CONFIG_FILE = CONFIG_DIR / "config.json"
+
+# Crear carpeta de configuración si no existe
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+# --- Configuración por Defecto ---
 DEFAULT_CONFIG = {
-    "rules": [],               # Lista limpia de reglas
-    "enforce_app_focus": True,
+    "rules": [],
+    "enforce_app_focus": False,
     "target_app_name": "",
-    "lang": "en"
+    "lang": "en",
+    "theme": "darkly"
 }

@@ -17,11 +17,14 @@ class MinimizedWindow:
         self.canvas = None # Referencia al canvas para redibujar
         self.size = 90     # Tamaño guardado
     
-    # 1. MODIFICAMOS show PARA ACEPTAR EL ESTADO
     def show(self, is_active=False):
         """Muestra la ventana minimizada con el estado visual correspondiente"""
         if self.window:
             return
+        
+        # 1. OBTENER COLORES DEL TEMA ACTUAL
+        style = ttk.Style()
+        theme_bg = style.colors.bg  # Fondo según el tema
         
         # Crear ventana flotante
         self.window = ttk.Toplevel(self.parent)
@@ -40,19 +43,20 @@ class MinimizedWindow:
         y_pos = int((screen_h / 2) - (size / 2))
         
         self.window.geometry(f"{size}x{size}+{x_pos}+{y_pos}")
-        self.window.configure(background='#0f0f0f')
         
-        # 2. Guardamos el canvas como self.canvas
+        # 2. APLICAR FONDO DEL TEMA
+        self.window.configure(background=theme_bg)
+        
         self.canvas = ttk.Canvas(
             self.window,
             width=self.size,
             height=self.size,
             highlightthickness=0,
-            bg="#0f0f0f"
+            bg=theme_bg
         )
         self.canvas.pack(fill="both", expand=True)
         
-        # 2. PASAMOS EL ESTADO AL DIBUJADO
+        # PASAMOS EL ESTADO AL DIBUJADO
         self._draw_pro_icon(self.canvas, size, is_active)
         
         # Eventos
@@ -69,37 +73,44 @@ class MinimizedWindow:
 
     def _draw_pro_icon(self, canvas, s, is_active):
         """
-        Dibuja un icono moderno. 
-        Cambia de color según is_active.
+        Dibuja un icono moderno usando los colores del tema.
         """
+        # 3. OBTENER PALETA DE COLORES DEL TEMA
+        style = ttk.Style()
+        colors = style.colors
+        
         pad = 5
         r = 16 
         
-        bg_color = "#1a1a1a"
+        bg_color = colors.bg
         
-        # 3. LÓGICA DE COLORES DINÁMICOS
+        # LÓGICA DE COLORES DINÁMICOS
         if is_active:
-            # ESTADO ACTIVO: Colores brillantes (Verde)
-            accent_color = "#00bc8c"  # Borde verde neón
-            icon_color = "#ffffff"    # Icono blanco brillante
-            dot_color = "#00ff00"     # LED verde encendido
-            key_fill = "#2b2b2b"      # Tecla normal
+            # ESTADO ACTIVO: Colores brillantes
+            accent_color = colors.success  # Borde verde (o color de éxito del tema)
+            icon_color = colors.fg         # Icono color principal (texto)
+            dot_color = colors.success     # LED encendido
+            key_fill = colors.secondary    # Cuerpo de la tecla
+            key_border = colors.border     # Borde estándar
         else:
-            # ESTADO INACTIVO: Colores apagados (Gris)
-            accent_color = "#444444"  # Borde gris oscuro
-            icon_color = "#777777"    # Icono grisáceo
-            dot_color = "#222222"     # LED apagado (casi negro)
-            key_fill = "#1f1f1f"      # Tecla más oscura
+            # ESTADO INACTIVO: Colores apagados
+            accent_color = colors.secondary
+            icon_color = colors.secondary  # Icono grisáceo (secondary)
+            dot_color = colors.dark        # LED apagado
+            key_fill = colors.inputbg      # Fondo tipo "input" (caja de texto vacía)
+            key_border = colors.border     # Borde estándar
             
-        # Borde exterior (Glow)
+        # Borde exterior (Glow/Marco)
         self._round_rect(canvas, pad, pad, s-pad, s-pad, r, outline=accent_color, width=2, fill=bg_color)
         
         # Representación de una Tecla
         k_pad = 22
-        # Sombra tecla
-        self._round_rect(canvas, k_pad, k_pad-2, s-k_pad, s-k_pad-2, 8, fill="#0d0d0d", outline="") 
+        
+        # Sombra tecla (usamos colors.dark para la profundidad)
+        self._round_rect(canvas, k_pad, k_pad-2, s-k_pad, s-k_pad-2, 8, fill=colors.dark, outline="") 
+        
         # Cara tecla (Usa color dinámico)
-        self._round_rect(canvas, k_pad, k_pad, s-k_pad, s-k_pad, 8, fill=key_fill, outline="#333333", width=1) 
+        self._round_rect(canvas, k_pad, k_pad, s-k_pad, s-k_pad, 8, fill=key_fill, outline=key_border, width=1) 
         
         # Icono (Usa color dinámico)
         canvas.create_text(s/2, s/2, text="🔧", font=("Segoe UI Emoji", 28), fill=icon_color)
@@ -108,7 +119,6 @@ class MinimizedWindow:
         ind_r = 3
         ind_x = s - 15
         ind_y = 15
-        # El LED usa el color dinámico
         canvas.create_oval(ind_x-ind_r, ind_y-ind_r, ind_x+ind_r, ind_y+ind_r, fill=dot_color, outline="")
 
     def _round_rect(self, canvas, x1, y1, x2, y2, radius=25, **kwargs):

@@ -30,12 +30,46 @@ class KeyForgeApp:
         
         self._create_window()
         self.key_handler.set_tk_root(self.root)
-        
+        self.root.after(100, self._post_initialization)
         self._create_ui_structure()
-        self._load_configuration()
+        self._load_initial_config()
 
+    def _load_initial_config(self):
+        """Carga solo lo visualmente esencial"""
+        config = self.config_manager.config
+        # Establecemos valores visuales rápidos
+        self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
+        if config.get("target_app_name"):
+            self.app_focus_component.set_app_name(config.get("target_app_name"))
+
+    def _post_initialization(self):
+        """Tareas pesadas que se ejecutan después de mostrar la ventana"""
+        # 1. Ajustar geometría final (ahora que los widgets existen)
         self._finalize_window_layout()
+        
+        # 2. Cargar reglas y lógica (puede tardar unos ms)
+        self._load_heavy_logic()
+        
+        # 3. Iniciar monitoreos
         self._init_monitoring()
+
+    def _load_heavy_logic(self):
+        """El resto de la configuración que requiere procesamiento"""
+        config = self.config_manager.config
+        
+        # Configurar monitor
+        self.app_monitor.set_enforce_focus(config.get("enforce_app_focus", True))
+        self.app_monitor.set_target_app(config.get("target_app_name", ""))
+        
+        # Cargar reglas
+        rules_data = config.get("rules", [])
+        if rules_data:
+            self.key_handler.load_rules(rules_data)
+        self._refresh_rules_ui()
+        
+        # ESTA ES LA CLAVE: Escanear ventanas es lento, ahora se hace aquí
+        self._refresh_windows_list()
+        self._toggle_app_focus()
 
     def _create_window(self):
         current_theme = self.config_manager.config.get("theme", "darkly")
