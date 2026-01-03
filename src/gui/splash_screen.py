@@ -1,7 +1,7 @@
 """
 src/gui/splash_screen.py
 Splash Screen Dinámico para KeyForge
-Se adapta automáticamente a temas claros y oscuros.
+Se adapta automáticamente a temas claros y oscuros y soporta traducción.
 """
 import ttkbootstrap as ttk
 from tkinter import Canvas
@@ -11,8 +11,9 @@ class SplashScreen:
     Splash screen minimalista que respeta el tema de la aplicación.
     """
     
-    def __init__(self, parent_root, title="KeyForge", version="1.0"):
+    def __init__(self, parent_root, tr_dict=None, title="KeyForge", version="1.0"):
         self.root = parent_root
+        self.tr = tr_dict if tr_dict else {}
         self.title_text = title
         self.version_text = f"v{version}"
         
@@ -69,16 +70,16 @@ class SplashScreen:
         """Dibuja los elementos usando colores dinámicos"""
         
         # Colores extraídos del tema
-        fg_color = self.colors.fg            # Texto principal (Negro en light, Blanco en dark)
-        secondary_color = self.colors.secondary  # Texto secundario (Gris)
-        border_color = self.colors.border    # Bordes
-        accent_color = self.colors.success   # Color de énfasis (Verde KeyForge)
+        fg_color = self.colors.fg            
+        secondary_color = self.colors.secondary  
+        border_color = self.colors.border    
+        accent_color = self.colors.success   
         
-        # Fondo de la barra de progreso (más oscuro o más claro según el tema)
+        # Fondo de la barra de progreso
         if self._is_light_theme():
-            bar_bg_color = "#e0e0e0" # Gris claro para temas light
+            bar_bg_color = "#e0e0e0" 
         else:
-            bar_bg_color = "#111111" # Gris muy oscuro para temas dark
+            bar_bg_color = "#111111" 
 
         # --- BORDES ---
         self.canvas.create_rectangle(
@@ -92,7 +93,7 @@ class SplashScreen:
             w//2, 50,
             text=f"🔧 {self.title_text}",
             font=("Segoe UI", 18, "bold"),
-            fill=fg_color, # <--- AQUÍ SE PRODUCE LA MAGIA (Blanco/Negro automático)
+            fill=fg_color,
             anchor="center"
         )
         
@@ -126,10 +127,10 @@ class SplashScreen:
         )
         
         # --- INFORMACIÓN DE ESTADO ---
-        # Izquierda: Texto de estado
+        initial_text = self.tr.get("splash_init", "Initializing...")
         self.status_text_id = self.canvas.create_text(
             50, bar_y + 20,
-            text="Initializing...",
+            text=initial_text,
             font=("Segoe UI", 8),
             fill=secondary_color,
             anchor="w"

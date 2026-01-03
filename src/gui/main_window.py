@@ -32,8 +32,13 @@ class KeyForgeApp:
         
         # ### CAMBIO: Mostrar Splash Screen inmediatamente después de crear root
         # Pasamos el root para que el splash herede el tema
-        self.splash = SplashScreen(self.root, title="KeyForge", version=CURRENT_VERSION)
-        self.splash.update_step(5, "Cargando configuración...")
+        self.splash = SplashScreen(
+            self.root, 
+            tr_dict=self.config_manager.tr,
+            title="KeyForge", 
+            version=CURRENT_VERSION
+        )
+        self.splash.update_step(5, self.config_manager.tr.get("splash_config", "Cargando configuración..."))
 
         self.app_monitor = AppMonitor()
         self.key_handler = KeyHandler(self.app_monitor)
@@ -45,7 +50,7 @@ class KeyForgeApp:
         self.is_restarting = False
         
         # 2. Configuraciones iniciales
-        self.splash.update_step(20, "Inicializando componentes gráficos...")
+        self.splash.update_step(20, self.config_manager.tr.get("splash_gui", "Inicializando componentes..."))
         self.key_handler.set_tk_root(self.root)
 
         self._create_ui_structure()
@@ -61,17 +66,6 @@ class KeyForgeApp:
         self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
         if config.get("target_app_name"):
             self.app_focus_component.set_app_name(config.get("target_app_name"))
-
-    def _post_initialization(self):
-        """Tareas pesadas que se ejecutan después de mostrar la ventana"""
-        # 1. Ajustar geometría final (ahora que los widgets existen)
-        self._finalize_window_layout()
-        
-        # 2. Cargar reglas y lógica (puede tardar unos ms)
-        self._load_heavy_logic()
-        
-        # 3. Iniciar monitoreos
-        self._init_monitoring()
 
     def _load_heavy_logic(self):
         """El resto de la configuración que requiere procesamiento"""
@@ -102,21 +96,22 @@ class KeyForgeApp:
 
     def _post_initialization(self):
         """Tareas pesadas y cierre del splash"""
-        
-        # Paso A: Lógica pesada
-        self.splash.update_step(40, "Escaneando sistema...")
+    
+        if hasattr(self, 'splash'): 
+            self.splash.update_step(40, self.config_manager.tr.get("splash_scan", "Escaneando sistema..."))
         self._finalize_window_layout()
-        
-        self.splash.update_step(60, "Cargando reglas y motores...")
+    
+        if hasattr(self, 'splash'): 
+            self.splash.update_step(60, self.config_manager.tr.get("splash_rules", "Cargando reglas..."))
         self._load_heavy_logic()
-        
-        self.splash.update_step(80, "Iniciando monitores de eventos...")
+    
+        if hasattr(self, 'splash'): 
+            self.splash.update_step(80, self.config_manager.tr.get("splash_monitors", "Iniciando monitores..."))
         self._init_monitoring()
-        
-        self.splash.update_step(100, "¡Listo!")
-        
-        # Paso B: Transición final
-        # Esperamos un instante pequeño para ver el 100%
+    
+        if hasattr(self, 'splash'): 
+            self.splash.update_step(100, self.config_manager.tr.get("splash_done", "¡Listo!"))
+    
         self.root.after(500, self._finish_loading)
     
     def _finish_loading(self):

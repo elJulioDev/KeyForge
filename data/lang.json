@@ -82,7 +82,14 @@
     "update_available_title": "¡Actualización Disponible!",
     "update_available_msg": "Nueva versión {version} disponible.\n¿Deseas ir a la página de descarga?",
     "no_update_msg": "Ya tienes la última versión ({version}).",
-    "update_error_msg": "Error al buscar actualizaciones."
+    "update_error_msg": "Error al buscar actualizaciones.",
+    "splash_init": "Iniciando...",
+    "splash_config": "Cargando configuración...",
+    "splash_gui": "Inicializando gráficos...",
+    "splash_scan": "Escaneando sistema...",
+    "splash_rules": "Cargando reglas y motores...",
+    "splash_monitors": "Iniciando monitores...",
+    "splash_done": "¡Listo!"
   },
   "en": {
     "title": "KeyForge",
@@ -165,6 +172,13 @@
     "update_available_title": "Update Available!",
     "update_available_msg": "New version {version} is available.\nDo you want to go to the download page?",
     "no_update_msg": "You have the latest version ({version}).",
-    "update_error_msg": "Error checking for updates."
+    "update_error_msg": "Error checking for updates.",
+    "splash_init": "Initializing...",
+    "splash_config": "Loading configuration...",
+    "splash_gui": "Initializing GUI...",
+    "splash_scan": "Scanning system...",
+    "splash_rules": "Loading rules and engines...",
+    "splash_monitors": "Starting monitors...",
+    "splash_done": "Ready!"
   }
 }
