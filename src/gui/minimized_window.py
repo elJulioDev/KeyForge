@@ -17,14 +17,14 @@ class MinimizedWindow:
         self.canvas = None # Referencia al canvas para redibujar
         self.size = 90     # Tamaño guardado
     
-    def show(self, is_active=False):
+    def show(self, is_active=False, center_pos=None):
         """Muestra la ventana minimizada con el estado visual correspondiente"""
         if self.window:
             return
         
-        # 1. OBTENER COLORES DEL TEMA ACTUAL
+        # OBTENER COLORES DEL TEMA ACTUAL
         style = ttk.Style()
-        theme_bg = style.colors.bg  # Fondo según el tema
+        theme_bg = style.colors.bg
         
         # Crear ventana flotante
         self.window = ttk.Toplevel(self.parent)
@@ -34,17 +34,23 @@ class MinimizedWindow:
         
         # Tamaño
         size = 90
-        # Posición inicial (Centrado en pantalla)
-        screen_w = self.parent.winfo_screenwidth()
-        screen_h = self.parent.winfo_screenheight()
         
-        # Fórmula: (AnchoPantalla / 2) - (AnchoVentana / 2)
-        x_pos = int((screen_w / 2) - (size / 2))
-        y_pos = int((screen_h / 2) - (size / 2))
+        # CÁLCULO DE POSICIÓN
+        if center_pos:
+            # Si nos dan el centro de la ventana principal, nos centramos ahí
+            cx, cy = center_pos
+            x_pos = int(cx - (size / 2))
+            y_pos = int(cy - (size / 2))
+        else:
+            # Fallback: Centrado en pantalla (comportamiento anterior)
+            screen_w = self.parent.winfo_screenwidth()
+            screen_h = self.parent.winfo_screenheight()
+            x_pos = int((screen_w / 2) - (size / 2))
+            y_pos = int((screen_h / 2) - (size / 2))
         
         self.window.geometry(f"{size}x{size}+{x_pos}+{y_pos}")
         
-        # 2. APLICAR FONDO DEL TEMA
+        # APLICAR FONDO DEL TEMA
         self.window.configure(background=theme_bg)
         
         self.canvas = ttk.Canvas(
@@ -169,8 +175,25 @@ class MinimizedWindow:
             self._restore()
 
     def _restore(self):
-        self.hide()
-        self.on_restore()
+        """Restaura la ventana principal pasando la posición actual"""
+        if self.window:
+            # 1. Obtener el centro actual de la ventana minimizada
+            mx = self.window.winfo_x()
+            my = self.window.winfo_y()
+            mw = self.window.winfo_width()
+            mh = self.window.winfo_height()
+            
+            center_x = mx + (mw / 2)
+            center_y = my + (mh / 2)
+            
+            # Ocultamos el icono
+            self.hide()
+            
+            # 2. Llamamos al callback pasando la posición (center_pos)
+            # Nota: self.on_restore es _restore_window en la app principal
+            self.on_restore(center_pos=(center_x, center_y))
+        else:
+            self.on_restore()
 
     def _fade_in(self, alpha=0.0):
         if self.window and alpha < 0.9:

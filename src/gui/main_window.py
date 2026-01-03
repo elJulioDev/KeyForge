@@ -161,8 +161,8 @@ class KeyForgeApp:
 
         # Arrastre (Vinculado al header y al título)
         for w in [header, title]:
-            w.bind("<Button-1>", self._start_drag)
-            w.bind("<B1-Motion>", self._do_drag)
+            w.bind("<Button-1>", lambda e: self.window_manager.start_drag(e, self.root))
+            w.bind("<B1-Motion>", lambda e: self.window_manager.drag(e, self.root))
 
         # --- 2. CUERPO PRINCIPAL (Pestañas) ---
         self.notebook = ttk.Notebook(self.root, bootstyle="primary")
@@ -481,13 +481,22 @@ class KeyForgeApp:
         self.root.geometry(f"+{x}+{y}")
 
     def _minimize_custom(self):
-        """Minimiza la ventana a un icono flotante"""
+        """Minimiza la ventana a un icono flotante conservando la posición visual"""
         if self.is_minimized:
             return
         
+        # CALCULAR CENTRO ACTUAL DE LA VENTANA PRINCIPAL
+        # Hacemos esto ANTES de withdraw() para obtener las coordenadas correctas
+        root_x = self.root.winfo_x()
+        root_y = self.root.winfo_y()
+        root_w = self.root.winfo_width()
+        root_h = self.root.winfo_height()
+        
+        center_x = root_x + (root_w / 2)
+        center_y = root_y + (root_h / 2)
+        
         self.root.withdraw()
         
-        # MODIFICADO: Pasamos self._toggle_script como tercer argumento
         self.minimized_window = MinimizedWindow(
             self.root, 
             self._restore_window,
@@ -495,7 +504,12 @@ class KeyForgeApp:
         )
         
         is_script_active = self.key_handler.is_active()
-        self.minimized_window.show(is_active=is_script_active)
+        
+        # PASAR EL CENTRO CALCULADO A SHOW()
+        self.minimized_window.show(
+            is_active=is_script_active, 
+            center_pos=(center_x, center_y)
+        )
         
         self.is_minimized = True
 
@@ -535,8 +549,32 @@ class KeyForgeApp:
             new_state = self.key_handler.is_active()
             self.minimized_window.update_visuals(new_state)
 
-    def _restore_window(self):
-        if self.minimized_window: self.minimized_window.hide()
+    def _restore_window(self, center_pos=None):
+        """Restaura la ventana, opcionalmente centrada en una posición"""
+        if self.minimized_window: 
+            self.minimized_window.hide()
+            
+        if center_pos:
+            # Desempaquetar el centro objetivo
+            cx, cy = center_pos
+            
+            # Obtener dimensiones actuales de la ventana principal
+            # Usamos winfo_width/height para exactitud, o fallback a lo solicitado
+            w = self.root.winfo_width()
+            h = self.root.winfo_height()
+            
+            # Si la ventana nunca se mostró, winfo puede ser 1x1. 
+            # Aseguramos dimensiones mínimas por si acaso.
+            if w < 100: w = 650
+            if h < 100: h = 550
+            
+            # Calcular nueva esquina superior izquierda (x, y)
+            new_x = int(cx - (w / 2))
+            new_y = int(cy - (h / 2))
+            
+            # Mover la ventana ANTES de mostrarla
+            self.root.geometry(f"+{new_x}+{new_y}")
+            
         self.root.deiconify()
         self.is_minimized = False
 
