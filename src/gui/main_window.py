@@ -15,14 +15,16 @@ from .components import (
 from .rules_manager import RulesManagerComponent
 from .minimized_window import MinimizedWindow
 from .accessibility_settings import AccessibilityComponent
+from ..utils.logger import get_logger
 
 class KeyForgeApp:
     def __init__(self):
+        self.logger = get_logger()
         self.config_manager = ConfigManager()
         self.app_monitor = AppMonitor()
         self.key_handler = KeyHandler(self.app_monitor)
         self.window_manager = WindowManager()
-        
+
         self.is_minimized = False
         self.minimized_window = None
         self.drag_data = {"x": 0, "y": 0}
@@ -362,6 +364,7 @@ class KeyForgeApp:
             return
 
         self.is_restarting = True
+        self.logger.info("Iniciando secuencia de reinicio...") # Log informativo
 
         # 1. Guardar estado y detener hilos
         try:
@@ -369,7 +372,8 @@ class KeyForgeApp:
                 self.key_handler.stop()
             self._stop_all_monitoring()
         except Exception as e:
-            print(f"Error limpiando antes de reiniciar: {e}")
+            # CAMBIO: Usar logger.error en lugar de print
+            self.logger.error(f"Error limpiando antes de reiniciar: {e}")
 
         # 2. Destruir la ventana actual
         try:
@@ -378,8 +382,9 @@ class KeyForgeApp:
             pass
 
         # 3. REINICIO ROBUSTO DEL PROCESO
-        # Esto detecta si estás corriendo en Python normal o en un .exe compilado
-        print("Reiniciando aplicación...")
+        # CAMBIO: Usar logger.info en lugar de print
+        self.logger.info("Ejecutando reinicio del proceso...")
+        
         if getattr(sys, 'frozen', False):
              # Si es un ejecutable (PyInstaller)
             os.execl(sys.executable, sys.executable, *sys.argv)
