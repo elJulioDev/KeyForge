@@ -550,7 +550,7 @@ class KeyForgeApp:
             self.minimized_window.update_visuals(new_state)
 
     def _restore_window(self, center_pos=None):
-        """Restaura la ventana, opcionalmente centrada en una posición"""
+        """Restaura la ventana, asegurando que quede dentro de los límites de la pantalla"""
         if self.minimized_window: 
             self.minimized_window.hide()
             
@@ -559,20 +559,34 @@ class KeyForgeApp:
             cx, cy = center_pos
             
             # Obtener dimensiones actuales de la ventana principal
-            # Usamos winfo_width/height para exactitud, o fallback a lo solicitado
             w = self.root.winfo_width()
             h = self.root.winfo_height()
             
-            # Si la ventana nunca se mostró, winfo puede ser 1x1. 
-            # Aseguramos dimensiones mínimas por si acaso.
+            # Fallback por si la ventana no se ha renderizado aún
             if w < 100: w = 650
             if h < 100: h = 550
             
-            # Calcular nueva esquina superior izquierda (x, y)
+            # Obtener dimensiones de la pantalla
+            screen_w = self.root.winfo_screenwidth()
+            screen_h = self.root.winfo_screenheight()
+            
+            # Calcular esquina superior izquierda ideal (centrada en el icono)
             new_x = int(cx - (w / 2))
             new_y = int(cy - (h / 2))
             
-            # Mover la ventana ANTES de mostrarla
+            # LIMITAR (CLAMPING) PARA NO SALIRSE DE PANTALLA
+            
+            # Eje X:
+            # - No menor a 0 (Borde izquierdo)
+            # - No mayor a screen_w - w (Borde derecho)
+            new_x = max(0, min(new_x, screen_w - w))
+            
+            # Eje Y:
+            # - No menor a 0 (Borde superior)
+            # - No mayor a screen_h - h (Borde inferior)
+            new_y = max(0, min(new_y, screen_h - h))
+            
+            # Mover la ventana a la posición segura
             self.root.geometry(f"+{new_x}+{new_y}")
             
         self.root.deiconify()
