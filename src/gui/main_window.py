@@ -16,11 +16,25 @@ from .rules_manager import RulesManagerComponent
 from .minimized_window import MinimizedWindow
 from .accessibility_settings import AccessibilityComponent
 from ..utils.logger import get_logger
+from src.config.constants import CURRENT_VERSION
+from .splash_screen import SplashScreen
 
 class KeyForgeApp:
     def __init__(self):
         self.logger = get_logger()
         self.config_manager = ConfigManager()
+
+        # Configuramos tema antes de crear ventana
+        current_theme = self.config_manager.config.get("theme", "darkly")
+        
+        # 1. Crear ventana (pero oculta)
+        self._create_window(current_theme) 
+        
+        # ### CAMBIO: Mostrar Splash Screen inmediatamente después de crear root
+        # Pasamos el root para que el splash herede el tema
+        self.splash = SplashScreen(self.root, title="KeyForge", version=CURRENT_VERSION)
+        self.splash.update_step(5, "Cargando configuración...")
+
         self.app_monitor = AppMonitor()
         self.key_handler = KeyHandler(self.app_monitor)
         self.window_manager = WindowManager()
@@ -30,11 +44,15 @@ class KeyForgeApp:
         self.drag_data = {"x": 0, "y": 0}
         self.is_restarting = False
         
-        self._create_window()
+        # 2. Configuraciones iniciales
+        self.splash.update_step(20, "Inicializando componentes gráficos...")
         self.key_handler.set_tk_root(self.root)
-        self.root.after(100, self._post_initialization)
+
         self._create_ui_structure()
         self._load_initial_config()
+
+        # 3. Programar la carga pesada y finalización del splash
+        self.root.after(100, self._post_initialization)
 
     def _load_initial_config(self):
         """Carga solo lo visualmente esencial"""
@@ -73,16 +91,45 @@ class KeyForgeApp:
         self._refresh_windows_list()
         self._toggle_app_focus()
 
-    def _create_window(self):
-        current_theme = self.config_manager.config.get("theme", "darkly")
-        self.root = ttk.Window(themename=current_theme)
+    def _create_window(self, theme_name):
+        self.root = ttk.Window(themename=theme_name)
         self.root.overrideredirect(True)
         self.root.title("KeyForge")
         self.root.resizable(False, False)
         self.root.attributes('-topmost', True)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-        # NOTA: Ya no definimos geometry aquí con w, h fijos.
-        # Se definirá en _finalize_window_layout
+        self.root.withdraw()
+
+    def _post_initialization(self):
+        """Tareas pesadas y cierre del splash"""
+        
+        # Paso A: Lógica pesada
+        self.splash.update_step(40, "Escaneando sistema...")
+        self._finalize_window_layout()
+        
+        self.splash.update_step(60, "Cargando reglas y motores...")
+        self._load_heavy_logic()
+        
+        self.splash.update_step(80, "Iniciando monitores de eventos...")
+        self._init_monitoring()
+        
+        self.splash.update_step(100, "¡Listo!")
+        
+        # Paso B: Transición final
+        # Esperamos un instante pequeño para ver el 100%
+        self.root.after(500, self._finish_loading)
+    
+    def _finish_loading(self):
+        """Cierra splash y muestra ventana principal"""
+        if hasattr(self, 'splash'):
+            self.splash.close()
+            del self.splash
+        
+        # Mostrar ventana principal
+        self.root.deiconify() 
+        # Asegurarse que esté encima
+        self.root.lift()
+        self.root.attributes('-topmost', True)
 
     def _finalize_window_layout(self):
         """Calcula el tamaño ideal basado en el contenido de las pestañas"""
