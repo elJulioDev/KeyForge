@@ -1,12 +1,13 @@
 """
-Componente de configuración de accesibilidad (Idioma y Tema)
+Componente de configuración de accesibilidad (Idioma, Tema y Actualizaciones)
 """
 import ttkbootstrap as ttk
 from tkinter import StringVar
-
+from tkinter.messagebox import askyesno, showinfo, showerror
+from src.utils.auto_updater import AutoUpdater
 
 class AccessibilityComponent:
-    """Componente para configurar idioma y tema de la aplicación"""
+    """Componente para configurar idioma, tema y actualizaciones"""
     
     # Temas disponibles en ttkbootstrap
     AVAILABLE_THEMES = [
@@ -42,6 +43,8 @@ class AccessibilityComponent:
         display_theme_name = self._get_display_name_from_code(current_theme)
         self.theme_var = StringVar(value=display_theme_name)
         
+        self.updater = AutoUpdater() # Instancia del actualizador
+        
         self._create_ui()
     
     def _create_ui(self):
@@ -49,14 +52,6 @@ class AccessibilityComponent:
         # Frame principal
         self.frame = ttk.Frame(self.parent, padding=20)
         self.frame.pack(fill="both", expand=True)
-        
-        # Título
-        title = ttk.Label(
-            self.frame,
-            text=self.tr.get("accessibility_title", "Accessibility"),
-            font=("-size", 14, "-weight", "bold")
-        )
-        title.pack(pady=(0, 20))
         
         # --- SECCIÓN IDIOMA ---
         lang_frame = ttk.Labelframe(
@@ -100,25 +95,52 @@ class AccessibilityComponent:
         )
         self.theme_combo.pack(fill="x", pady=5)
         self.theme_combo.bind("<<ComboboxSelected>>", lambda e: self._on_theme_change())
-                
-        # Info
-        ttk.Separator(self.frame).pack(fill="x", pady=15)
-        
-        info_label = ttk.Label(
+
+        # --- SECCIÓN ACTUALIZACIONES ---
+        update_frame = ttk.Labelframe(
             self.frame,
-            text=self.tr.get("accessibility_info", "⚠️ The application will restart to apply changes"),
-            font=("-size", 9)
+            text=self.tr.get("updates_title", "Updates"),
+            padding=15
         )
-        info_label.pack()
+        update_frame.pack(fill="x", pady=(0, 15))
+
+        self.check_btn = ttk.Button(
+            update_frame,
+            text=self.tr.get("check_updates_btn", "Check for Updates"),
+            command=self._check_updates,
+            bootstyle="primary",
+            width=25
+        )
+        self.check_btn.pack()
     
+    def _check_updates(self):
+        """Lógica del botón de actualizar"""
+        original_text = self.check_btn.cget("text")
+        self.check_btn.configure(text=self.tr.get("checking_updates", "Checking..."), state="disabled")
+        self.frame.update() # Forzar refresco de UI
+
+        has_update, data = self.updater.check_for_updates()
+
+        self.check_btn.configure(text=original_text, state="normal")
+
+        if has_update:
+            # Data es un dict con {version, url, body}
+            msg = self.tr.get("update_available_msg", "New version available").format(version=data['version'])
+            if askyesno(self.tr.get("update_available_title", "Update Available"), msg):
+                self.updater.open_download_page(data['url'])
+        else:
+            # Data es el string de la versión actual o un mensaje de error
+            if "error" in str(data).lower() or "exception" in str(data).lower():
+                showerror(self.tr.get("error_title", "Error"), self.tr.get("update_error_msg", "Error updating"))
+            else:
+                showinfo(self.tr.get("title", "KeyForge"), self.tr.get("no_update_msg", "Up to date").format(version=data))
+
     def _get_translated_themes(self):
         """Retorna lista de temas (Nombres originales capitalizados)"""
-        # Simplemente capitalizamos el nombre: 'darkly' -> 'Darkly'
         return [theme.capitalize() for theme in self.AVAILABLE_THEMES]
     
     def _get_theme_code_from_display(self, display_name):
         """Convierte nombre mostrado a código de tema"""
-        # Inverso: 'Darkly' -> 'darkly'
         return display_name.lower()
     
     def _on_language_change(self):
@@ -146,5 +168,4 @@ class AccessibilityComponent:
     
     def _get_display_name_from_code(self, theme_code):
         """Devuelve el nombre para mostrar dado un código"""
-        # 'darkly' -> 'Darkly'
         return theme_code.capitalize()

@@ -4,6 +4,11 @@ Constantes y configuraciones globales del proyecto
 import sys
 from pathlib import Path
 
+# --- Versión y Repositorio ---
+CURRENT_VERSION = "1.4.0" 
+GITHUB_REPO_OWNER = "elJulioDev"
+GITHUB_REPO_NAME = "KeyForge"
+
 def get_base_path():
     """Ruta de los archivos internos (Solo LECTURA: código, lang.json, imágenes)"""
     if getattr(sys, 'frozen', False):

@@ -29,7 +29,7 @@
     "minimize_btn": "➖ Minimizar",
     "exit_btn": "✕ Salir",
     "footer_config_info": "📂 Config: {config_file}",
-    "footer_version": "v1.1.1 • KeyForge",
+    "footer_version": "v1.4.0 • KeyForge",
     "common_keys_title": "Teclas Disponibles",
     "close_btn": "Cerrar",
     "common_keys_desc": "📋 Teclas Comunes del Teclado",
@@ -75,7 +75,14 @@
     "theme_darkly": "Oscuro",
     "theme_superhero": "Superhéroe",
     "settings_saved": "Configuración guardada. Reiniciando interfaz...",
-    "accessibility_info": "⚠️ La aplicación se reiniciará para aplicar los cambios"
+    "accessibility_info": "⚠️ La aplicación se reiniciará para aplicar los cambios",
+    "updates_title": "🔄 Actualizaciones",
+    "check_updates_btn": "Buscar Actualizaciones",
+    "checking_updates": "Buscando...",
+    "update_available_title": "¡Actualización Disponible!",
+    "update_available_msg": "Nueva versión {version} disponible.\n¿Deseas ir a la página de descarga?",
+    "no_update_msg": "Ya tienes la última versión ({version}).",
+    "update_error_msg": "Error al buscar actualizaciones."
   },
   "en": {
     "title": "KeyForge",
@@ -107,7 +114,7 @@
     "minimize_btn": "➖ Minimize",
     "exit_btn": "✕ Exit",
     "footer_config_info": "📂 Config: {config_file}",
-    "footer_version": "v1.1.1 • KeyForge",
+    "footer_version": "v1.4.0 • KeyForge",
     "common_keys_title": "Available Keys",
     "close_btn": "Close",
     "common_keys_desc": "📋 Common Keyboard Keys",
@@ -151,6 +158,13 @@
     "spanish": "Spanish",
     "english": "English",
     "settings_saved": "Settings saved. Restarting interface...",
-    "accessibility_info": "⚠️ The application will restart to apply changes"
+    "accessibility_info": "⚠️ The application will restart to apply changes",
+    "updates_title": "🔄 Updates",
+    "check_updates_btn": "Check for Updates",
+    "checking_updates": "Checking...",
+    "update_available_title": "Update Available!",
+    "update_available_msg": "New version {version} is available.\nDo you want to go to the download page?",
+    "no_update_msg": "You have the latest version ({version}).",
+    "update_error_msg": "Error checking for updates."
   }
 }
