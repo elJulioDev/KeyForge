@@ -1,3 +1,6 @@
 ttkbootstrap>=1.19.0
 keyboard>=0.13.5
 pygetwindow>=0.0.9
+requests>=2.31.0
+packaging>=23.0
+pywin32>=306
