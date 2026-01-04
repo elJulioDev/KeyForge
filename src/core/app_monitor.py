@@ -145,8 +145,10 @@ class AppMonitor:
         titles = []
         my_pid = os.getpid()
 
-        # LISTA NEGRA EXTENDIDA
-        # Incluye procesos de sistema y UWP que suelen quedar en background
+        # LISTA NEGRA: Solo bloquear procesos de sistema que NUNCA queremos targetear.
+        # He eliminado apps como 'Calculator', 'Settings', etc. de esta lista dura
+        # porque tus filtros #3 (Cloaked) y #5 (Dimensiones) ya deberían eliminar
+        # sus versiones fantasma/background.
         garbage_titles = {
             "Program Manager", 
             "Default IME", 
@@ -154,14 +156,16 @@ class AppMonitor:
             "NVIDIA GeForce Overlay",
             "Microsoft Text Input Application",
             "Windows Input Experience",
-            "Settings", 
-            "Configuración",
-            "Calculator", 
-            "Calculadora",
             "Cortana",
             "Search",
             "Start",
-            "Inicio"
+            "Inicio",
+            "logs",
+            "Configuración",
+            "Settings"
+            # Las siguientes han sido removidas para permitir su detección si son ventanas reales:
+            # "Settings", "Configuración", "Calculator", "Calculadora", 
+            # "Movies & TV", "Películas y TV"
         }
 
         def enum_window_callback(hwnd, lParam):
@@ -176,6 +180,7 @@ class AppMonitor:
                 return True
 
             # 3. Filtro DWM: Apps suspendidas (Cloaked)
+            # ESTE ES CLAVE PARA APPS UWP: Elimina Calculadora/Configuración cuando están minimizadas/suspendidas
             if self._dwmapi:
                 is_cloaked = ctypes.c_int(0)
                 hr = self._dwmapi.DwmGetWindowAttribute(
@@ -196,8 +201,8 @@ class AppMonitor:
             if owner != 0 and not (ex_style & WS_EX_APPWINDOW):
                 return True
 
-            # 5. NUEVO: Filtro de Dimensiones
-            # Muchas apps "invisibles" tienen tamaño 0x0 o 1x1 aunque digan ser visibles
+            # 5. Filtro de Dimensiones
+            # Elimina ventanas fantasma de 0x0 o 1x1
             rect = wintypes.RECT()
             self._user32.GetWindowRect(hwnd, ctypes.byref(rect))
             w = rect.right - rect.left
@@ -219,7 +224,14 @@ class AppMonitor:
                 
             # Verificar contra lista negra
             if text in garbage_titles:
-                return True
+                # EXCEPCIÓN INTELIGENTE:
+                # Si por alguna razón una ventana de "basura" (ej. Cortana o Inicio) 
+                # es la ventana ACTIVA (tiene el foco del usuario), permitimos que salga.
+                # Esto cumple con "si están siendo utilizados".
+                active_hwnd = self._user32.GetForegroundWindow()
+                if hwnd != active_hwnd:
+                    return True
+                # Si es la ventana activa, pasa aunque esté en lista negra
             
             titles.append(text)
             return True
