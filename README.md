@@ -8,19 +8,31 @@ It is designed with a modular architecture that separates the key interception l
 * **Hybrid Remapping Engine:**
     * **Hold Mode:** The remapped key remains physically pressed while the user holds down the original key.
     * **Toggle Mode:** Converts any key into a switch (On/Off), ideal for automating held actions without physical effort.
+    * **Zero Latency:** Optimized algorithm using O(1) Hash Map lookups for instant response times.
     * **Recursion Prevention:** Internal algorithm that prevents infinite loops if rules intersect (e.g., A->B and B->A).
 
 * **Smart Focus:**
     * **Contextual Detection:** Allows linking key profiles to a specific window (e.g., "Minecraft", "Photoshop"). If you switch windows, the script pauses automatically.
     * **WinEventHook (Optimization):** On Windows, it uses the low-level API (`user32.dll`) to detect focus changes via events instead of constant polling, reducing CPU usage to nearly zero.
-* **Personalization & Accessibility Hub (New in v1.3.2):**
+
+* **Enhanced User Experience (New in v1.4):**
+    * **Dynamic Splash Screen:** A polished startup experience that automatically adapts to your selected theme (Light/Dark) and displays loading progress.
+    * **Automatic Updates:** Integrated system that checks GitHub Releases to notify you when a new version is available, ensuring you always have the latest features and fixes.
+
+* **Personalization & Accessibility Hub:**
     * **Theme Selector:** Instantly switch between multiple visual styles, including Light (Cosmo, Flatly, Yeti) and Dark (Darkly, Cyborg, Vapor) themes to match your system or preference.
     * **Language Switcher:** Change interface language (English/Spanish) directly from the GUI.
     * **Auto-Restart System:** The application intelligently restarts itself to apply visual and language changes seamlessly.
+
+* **Advanced Diagnostics (New in v1.4):**
+    * **Professional Logging:** Robust rotating log system that tracks errors and performance metrics without filling up your disk (auto-cleanup included).
+    * **Performance Monitoring:** Latency tracking to ensure the hook engine remains responsive under load.
+
 * **Modern and Functional Interface:**
     * **Dark Mode Design:** Built with `ttkbootstrap` for a clean and professional aesthetic.
     * **Floating Widget (Mini-Mode):** Ability to minimize the app to a semi-transparent floating widget that visually indicates the script status (Active/Inactive) without being intrusive.
     * **CRUD Rule Manager:** Interactive table to add, edit, and delete multiple remapping rules simultaneously.
+
 * **Persistence and Localization:**
     * Automatic configuration saving system in JSON.
     * Multi-language support (Spanish/English) with dynamic loading from `lang.json`.
@@ -33,6 +45,7 @@ The project uses a stack focused on operating system integration and user experi
     * `keyboard`: For installing global keyboard hooks.
     * `pygetwindow`: For active window management and detection.
     * `ctypes` (WinAPI): For deep integration with Windows events.
+    * `requests` & `packaging`: For the auto-update mechanism.
 * **Packaging:** Structure prepared for compilation with `PyInstaller` (relative path support with `sys._MEIPASS`).
 
 ## Prerequisites
@@ -101,15 +114,18 @@ keyforge/
 │   │   └── constants.py
 │   ├── core/                           # Business logic (Backend)
 │   │   ├── app_monitor.py              # Window detection (Polling/Hooks)
-│   │   ├── key_handler.py              # Remapping logic and cycle prevention
+│   │   ├── key_handler.py              # Remapping logic (O(1) Map)
 │   │   └── window_event_monitor.py     # ctypes wrapper for WinAPI
 │   ├── gui/                            # Graphical Interface (Frontend)
 │   │   ├── accessibility_settings.py   # Language & Theme configuration
 │   │   ├── components.py               # Reusable widgets (Status, Buttons)
 │   │   ├── main_window.py              # Main window and orchestrator
 │   │   ├── minimized_window.py         # Floating widget (Canvas drawing)
-│   │   └── rules_manager.py            # Rule management table (Treeview)
+│   │   ├── rules_manager.py            # Rule management table (Treeview)
+│   │   └── splash_screen.py            # Dynamic loading screen [New]
 │   └── utils/                          # General utilities
+│       ├── auto_updater.py             # GitHub Releases checker [New]
+│       ├── logger.py                   # Rotating log system [New]
 │       └── window_manager.py           # Window centering and dragging
 ├── KeyForge.py                         # Entry Point
 ├── requirements.txt                    # Project dependencies
