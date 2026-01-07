@@ -59,7 +59,7 @@ Follow these steps to set up the project in your local environment:
 
 1. **Clone the repository:**
 ```bash
-git clone [https://github.com/elJulioDev/keyforge.git](https://github.com/elJulioDev/keyforge.git)
+git clone https://github.com/elJulioDev/KeyForge.git
 cd keyforge
 ```
 
