@@ -8,6 +8,8 @@ import sys
 import os
 import time
 import ctypes
+import subprocess
+import shutil
 from typing import List, Optional, Callable
 
 try:
@@ -117,13 +119,34 @@ class AppMonitor:
             return ""
     
     def _get_active_window_fallback(self) -> str:
+        current_time = time.time()
+        if (current_time - self._cache["timestamp"]) < self._cache_timeout and self._cache["hwnd"] == "fallback":
+            return self._cache["title"]
+
+        title = ""
+        if shutil.which("xdotool"):
+            title = self._run_cmd(["xdotool", "getactivewindow", "getwindowname"]).strip()
+
+        if not title:
+            try:
+                import pygetwindow as gw
+                active_window = gw.getActiveWindow()
+                if active_window:
+                    title = active_window.title
+            except Exception:
+                pass
+
+        self._cache = {"hwnd": "fallback", "title": title, "timestamp": current_time}
+        return title
+
+    @staticmethod
+    def _run_cmd(args) -> str:
+        """Ejecuta un comando externo (wmctrl/xdotool) con timeout corto y sin romper si falla"""
         try:
-            import pygetwindow as gw
-            active_window = gw.getActiveWindow()
-            if active_window: return active_window.title
+            result = subprocess.run(args, capture_output=True, text=True, timeout=0.5)
+            return result.stdout
         except Exception:
-            pass
-        return ""
+            return ""
     
     def update_status(self) -> bool:
         self.target_app_is_active = self.is_target_app_active()
@@ -242,6 +265,17 @@ class AppMonitor:
         return sorted(list(set(titles)))
 
     def _get_windows_fallback_list(self) -> List[str]:
+        if shutil.which("wmctrl"):
+            out = self._run_cmd(["wmctrl", "-l"])
+            titles = []
+            for line in out.splitlines():
+                # Formato: <id> <desktop> <host> <título...>
+                parts = line.split(None, 3)
+                if len(parts) == 4 and parts[3].strip():
+                    titles.append(parts[3].strip())
+            if titles:
+                return sorted(set(titles))
+
         try:
             import pygetwindow as gw
             all_windows = gw.getAllTitles()
