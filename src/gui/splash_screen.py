@@ -5,6 +5,7 @@ Se adapta automáticamente a temas claros y oscuros y soporta traducción.
 """
 import ttkbootstrap as ttk
 from tkinter import Canvas
+from ..utils.icons import get_icon
 
 class SplashScreen:
     """
@@ -89,12 +90,15 @@ class SplashScreen:
         )
         
         # --- TÍTULO (Color adaptativo) ---
+        title_icon = get_icon("wrench", 22, fg_color)
+        self.canvas.create_image(w//2 - 62, 50, image=title_icon, anchor="e")
+        self.canvas.title_icon = title_icon  # referencia viva
         self.canvas.create_text(
-            w//2, 50,
-            text=f"🔧 {self.title_text}",
+            w//2 - 50, 50,
+            text=self.title_text,
             font=("Segoe UI", 18, "bold"),
             fill=fg_color,
-            anchor="center"
+            anchor="w"
         )
         
         # --- VERSIÓN ---

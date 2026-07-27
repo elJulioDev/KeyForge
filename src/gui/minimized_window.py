@@ -3,6 +3,7 @@ Ventana minimizada flotante
 """
 import ttkbootstrap as ttk
 from ..utils.window_manager import WindowManager
+from ..utils.icons import get_icon
 
 
 class MinimizedWindow:
@@ -119,7 +120,8 @@ class MinimizedWindow:
         self._round_rect(canvas, k_pad, k_pad, s-k_pad, s-k_pad, 8, fill=key_fill, outline=key_border, width=1) 
         
         # Icono (Usa color dinámico)
-        canvas.create_text(s/2, s/2, text="🔧", font=("Segoe UI Emoji", 28), fill=icon_color)
+        wrench_icon = get_icon("wrench", 32, icon_color)
+        canvas.create_image(s/2, s/2, image=wrench_icon)
         
         # Indicador de estado (LED)
         ind_r = 3

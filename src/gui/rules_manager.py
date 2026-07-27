@@ -4,7 +4,7 @@ Componente para gestionar múltiples reglas de remapeo
 import ttkbootstrap as ttk
 from tkinter import messagebox
 from .components import CommonKeysWindow
-from ..utils import WindowManager
+from ..utils import WindowManager, get_icon
 
 
 class RulesManagerComponent:
@@ -39,26 +39,39 @@ class RulesManagerComponent:
         btn_frame = ttk.Frame(toolbar)
         btn_frame.pack(side="right")
 
-        ttk.Button(
-            btn_frame,
-            text=self.tr.get("delete_rule_btn", "🗑️ Delete"),
-            bootstyle="danger-info",
-            command=self._delete_rule
-        ).pack(side="right", padx=5)
+        icon_delete = get_icon("trash-2", 14, "#FFFFFF")
+        icon_edit = get_icon("pencil", 14, "#FFFFFF")
+        icon_add = get_icon("plus", 14, "#FFFFFF")
 
-        ttk.Button(
+        btn_delete = ttk.Button(
             btn_frame,
-            text=self.tr.get("edit_rule_btn", "✏️ Edit"),
+            text=self.tr.get("delete_rule_btn", "Delete"),
+            image=icon_delete, compound="left",
+            bootstyle="danger",
+            command=self._delete_rule
+        )
+        btn_delete.image = icon_delete
+        btn_delete.pack(side="right", padx=5)
+
+        btn_edit = ttk.Button(
+            btn_frame,
+            text=self.tr.get("edit_rule_btn", "Edit"),
+            image=icon_edit, compound="left",
             bootstyle="info",
             command=self._edit_rule_dialog
-        ).pack(side="right", padx=5)
+        )
+        btn_edit.image = icon_edit
+        btn_edit.pack(side="right", padx=5)
         
-        ttk.Button(
+        btn_add = ttk.Button(
             btn_frame,
-            text=self.tr.get("add_rule_btn", "➕ Add"),
+            text=self.tr.get("add_rule_btn", "Add"),
+            image=icon_add, compound="left",
             bootstyle="success",
             command=self._add_rule_dialog
-        ).pack(side="right", padx=5)
+        )
+        btn_add.image = icon_add
+        btn_add.pack(side="right", padx=5)
         
         # --- TABLA ---
         tree_frame = ttk.Frame(self.frame)
@@ -80,6 +93,10 @@ class RulesManagerComponent:
         self.tree.heading("target", text=self.tr.get("with_label", "Output").replace(":", ""))
         self.tree.heading("mode", text=self.tr.get("mode_title", "Mode"))
         self.tree.heading("status", text=self.tr.get("status_label", "Status"))
+
+        colors = ttk.Style().colors
+        self.tree.tag_configure("rule-enabled", foreground=colors.success)
+        self.tree.tag_configure("rule-disabled", foreground=colors.danger)
         
         self.tree.column("source", width=100, anchor="center")
         self.tree.column("target", width=100, anchor="center")
@@ -97,7 +114,7 @@ class RulesManagerComponent:
         # Footer con tip
         ttk.Label(
             self.frame,
-            text=self.tr.get("rules_tip", "💡 Tip: Double click to edit a rule"),
+            text=self.tr.get("rules_tip", "Tip: Double click to edit a rule"),
             font=("-size", 8),
             bootstyle="secondary"
         ).pack(pady=(5, 0), anchor="w")
@@ -119,14 +136,15 @@ class RulesManagerComponent:
         
         for rule in rules:
             mode_text = self.tr.get("hold", "Hold") if rule.mode == "hold" else self.tr.get("toggle", "Toggle")
-            status_text = "✅" if rule.enabled else "❌" # Usar iconos visuales
+            status_text = "✓" if rule.enabled else "✕"
+            status_tag = "rule-enabled" if rule.enabled else "rule-disabled"
             
             self.tree.insert("", "end", values=(
                 rule.key_to_replace.upper(),
                 rule.replacement_key.upper(),
                 mode_text,
                 status_text
-            ))
+            ), tags=(status_tag,))
             
     def _add_rule_dialog(self):
         RuleDialog(self.parent, self.tr, self.on_detect_key, callback=self._on_rule_added)
@@ -198,7 +216,6 @@ class RuleDialog:
         
         self.dialog.resizable(False, False)
         self.dialog.transient(parent)
-        self.dialog.grab_set()
         
         self._create_ui()
         
@@ -207,25 +224,34 @@ class RuleDialog:
             
         # APLICAMOS EL AJUSTE AUTOMÁTICO AL FINAL
         self.window_manager.center_and_resize(self.dialog)
+        # Aseguramos que quede por encima del root (fix stacking en Linux)
+        self.window_manager.elevate(self.dialog, parent)
+        self.dialog.grab_set()
     
     def _create_ui(self):
         main_frame = ttk.Frame(self.dialog, padding=20)
         main_frame.pack(fill="both", expand=True)
-        
+
+        search_icon = get_icon("search", 14, ttk.Style().colors.secondary)
+
         # Inputs
         ttk.Label(main_frame, text=self.tr.get("replace_label", "Key to Replace:"), bootstyle="primary").pack(anchor="w")
         source_frame = ttk.Frame(main_frame)
         source_frame.pack(fill="x", pady=(5, 15))
         self.source_var = ttk.StringVar()
         ttk.Entry(source_frame, textvariable=self.source_var).pack(side="left", fill="x", expand=True, padx=(0,5))
-        ttk.Button(source_frame, text="🔍", command=lambda: self._detect_key(self.source_var), bootstyle="secondary-outline").pack(side="right")
+        btn_detect_source = ttk.Button(source_frame, image=search_icon, command=lambda: self._detect_key(self.source_var), bootstyle="secondary-outline")
+        btn_detect_source.image = search_icon
+        btn_detect_source.pack(side="right")
         
         ttk.Label(main_frame, text=self.tr.get("with_label", "Replace with:"), bootstyle="primary").pack(anchor="w")
         target_frame = ttk.Frame(main_frame)
         target_frame.pack(fill="x", pady=(5, 10))
         self.target_var = ttk.StringVar()
         ttk.Entry(target_frame, textvariable=self.target_var).pack(side="left", fill="x", expand=True, padx=(0,5))
-        ttk.Button(target_frame, text="🔍", command=lambda: self._detect_key(self.target_var), bootstyle="secondary-outline").pack(side="right")
+        btn_detect_target = ttk.Button(target_frame, image=search_icon, command=lambda: self._detect_key(self.target_var), bootstyle="secondary-outline")
+        btn_detect_target.image = search_icon
+        btn_detect_target.pack(side="right")
 
         ttk.Button(main_frame, text=self.tr.get("show_keys_btn", "Keyboard Map"), bootstyle="link", command=self._show_common_keys).pack(anchor="e")
         

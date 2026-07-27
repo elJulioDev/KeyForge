@@ -4,6 +4,7 @@ Componentes individuales de la interfaz gráfica
 import ttkbootstrap as ttk
 from tkinter import StringVar, BooleanVar, messagebox
 from ..utils import WindowManager
+from ..utils.icons import get_icon
 
 class StatusComponent:
     """Componente que muestra el estado del script y la aplicación"""
@@ -35,7 +36,7 @@ class StatusComponent:
             """Actualiza el estado del script"""
             if is_active:
                 # Mensaje genérico para múltiples reglas
-                text = f"🟢 {self.tr.get('active_rules', 'Activo')}: {rule_count} {self.tr.get('rule_label', 'Reglas')}"
+                text = f"{self.tr.get('active_rules', 'Activo')}: {rule_count} {self.tr.get('rule_label', 'Reglas')}"
                 self.status_label.config(text=text, bootstyle="success")
             else:
                 self.status_label.config(
@@ -270,13 +271,15 @@ class AppFocusComponent:
         self.app_combo.grid(row=0, column=1, padx=(8, 4), pady=4, sticky="ew")
         self.app_combo.bind("<<ComboboxSelected>>", lambda e: self.on_selected())
         
+        icon_refresh = get_icon("refresh-cw", 14, ttk.Style().colors.info)
         self.btn_refresh = ttk.Button(
             app_select_container,
-            text="🔄",
+            image=icon_refresh,
             command=self.on_refresh,
             bootstyle="info-outline",
             width=4
         )
+        self.btn_refresh.image = icon_refresh
         self.btn_refresh.grid(row=0, column=2, pady=4)
         
         app_select_container.columnconfigure(1, weight=1)
@@ -323,10 +326,17 @@ class ControlButtonsComponent:
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x", padx=20, pady=(0, 10))
         
+        self.icon_play = get_icon("play", 14, "#FFFFFF")
+        self.icon_pause = get_icon("pause", 14, "#FFFFFF")
+        icon_save = get_icon("save", 14, "#FFFFFF")
+        icon_minimize = get_icon("minus", 14, "#FFFFFF")
+        icon_exit = get_icon("x", 14, "#FFFFFF")
+
         # Botón principal de activar/desactivar (Grande)
         self.toggle_btn = ttk.Button(
             self.frame,
             text=self.tr.get("activate_script_btn", "Activar Script"),
+            image=self.icon_play, compound="left",
             command=on_toggle_callback,
             bootstyle="success",
             cursor="hand2"
@@ -341,27 +351,33 @@ class ControlButtonsComponent:
         self.btn_save = ttk.Button(
             secondary_btns,
             text=self.tr.get("save_btn", "Guardar Config"),
+            image=icon_save, compound="left",
             command=on_save_callback,
             bootstyle="info"
         )
+        self.btn_save.image = icon_save
         self.btn_save.pack(side="left", fill="x", expand=True, padx=(0, 4))
         
         # Botón Minimizar (Centro)
         self.btn_minimize = ttk.Button(
             secondary_btns,
             text=self.tr.get("minimize_btn", "Minimizar"),
+            image=icon_minimize, compound="left",
             command=on_minimize_callback,
             bootstyle="secondary"
         )
+        self.btn_minimize.image = icon_minimize
         self.btn_minimize.pack(side="left", fill="x", expand=True, padx=(4, 4))
         
         # Botón Salir (Derecha)
         self.btn_exit = ttk.Button(
             secondary_btns,
             text=self.tr.get("exit_btn", "Salir"),
+            image=icon_exit, compound="left",
             command=on_exit_callback,
-            bootstyle="danger-info"
+            bootstyle="danger"
         )
+        self.btn_exit.image = icon_exit
         self.btn_exit.pack(side="left", fill="x", expand=True, padx=(4, 0))
     
     def set_toggle_state(self, is_active):
@@ -369,11 +385,13 @@ class ControlButtonsComponent:
         if is_active:
             self.toggle_btn.config(
                 text=self.tr.get("stop_script_btn", "Detener Script"),
+                image=self.icon_pause,
                 bootstyle="warning"
             )
         else:
             self.toggle_btn.config(
                 text=self.tr.get("activate_script_btn", "Activar Script"),
+                image=self.icon_play,
                 bootstyle="success"
             )
 
@@ -391,14 +409,15 @@ class CommonKeysWindow:
         # w, h = 520, 450 ... self._center_window(w, h) <-- BORRAR
         
         self.window.resizable(False, False)
-        self.window.attributes('-topmost', True)
         self.window.transient(parent)
-        self.window.grab_set()
         
         self._create_content()
         
         # APLICAMOS AJUSTE AUTOMÁTICO
         self.window_manager.center_and_resize(self.window)
+        # Aseguramos que quede por encima del root (fix stacking en Linux)
+        self.window_manager.elevate(self.window, parent)
+        self.window.grab_set()
 
     def _create_content(self):
         # ... (El contenido de _create_content y _get_common_keys_text se mantiene IGUAL) ...

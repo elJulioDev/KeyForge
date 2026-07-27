@@ -7,6 +7,7 @@ import sys, os
 from ..config import ConfigManager
 from ..core import KeyHandler, AppMonitor
 from ..utils import WindowManager
+from ..utils import get_icon
 from .components import (
     StatusComponent,
     AppFocusComponent,
@@ -90,8 +91,11 @@ class KeyForgeApp:
         self.root.overrideredirect(True)
         self.root.title("KeyForge")
         self.root.resizable(False, False)
-        self.root.attributes('-topmost', True)
+        # NOTA: sin -topmost permanente. En Linux, dejar el root siempre
+        # encima impedía que los diálogos (Toplevel) se mostraran por
+        # encima de la ventana principal. Ver WindowManager.elevate().
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.iconphoto(True, get_icon("wrench", 64, "#3B82F6"))
         self.root.withdraw()
 
     def _post_initialization(self):
@@ -122,9 +126,8 @@ class KeyForgeApp:
         
         # Mostrar ventana principal
         self.root.deiconify() 
-        # Asegurarse que esté encima
+        # Asegurarse que esté encima (una sola vez, sin quedar topmost fijo)
         self.root.lift()
-        self.root.attributes('-topmost', True)
 
     def _finalize_window_layout(self):
         """Calcula el tamaño ideal basado en el contenido de las pestañas"""
@@ -156,7 +159,12 @@ class KeyForgeApp:
         
         # Título (sin botones de ventana)
         from .. import __version__
-        title = ttk.Label(header, text=f"🔧 KeyForge v{__version__}", font=("Segoe UI", 12, "bold"), bootstyle="inverse-secondary")
+        title_icon = get_icon("wrench", 16, "#F0F0F0")
+        title = ttk.Label(
+            header, image=title_icon, text=f" KeyForge v{__version__}",
+            compound="left", font=("Segoe UI", 12, "bold"), bootstyle="inverse-secondary"
+        )
+        title.image = title_icon  # referencia viva (Tkinter no la retiene sola)
         title.pack(side="left", padx=15)
 
         # Arrastre (Vinculado al header y al título)
@@ -328,30 +336,6 @@ class KeyForgeApp:
             err_title = self.config_manager.tr.get("error_title", "Error")
             err_msg = self.config_manager.tr.get(error, error)
             messagebox.showerror(err_title, err_msg)
-
-    def _toggle_script(self):
-        if self.key_handler.is_active():
-            self.key_handler.stop()
-            self.status_component.update_script_status(False)
-            self.control_buttons.set_toggle_state(False)
-            self.rules_manager.set_controls_state(True)
-            self.app_focus_component.set_controls_state(True)
-        else:
-            if not self.key_handler.get_rules():
-                messagebox.showwarning("KeyForge", "Add at least one rule first.")
-                return
-            
-            self.app_monitor.set_enforce_focus(self.app_focus_component.is_focus_enabled())
-            self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
-            
-            success, error = self.key_handler.start()
-            if success:
-                self.status_component.update_script_status(True, len(self.key_handler.get_rules()))
-                self.control_buttons.set_toggle_state(True)
-                self.rules_manager.set_controls_state(False)
-                self.app_focus_component.set_controls_state(False)
-            else:
-                messagebox.showerror("Error", error)
 
     def _init_monitoring(self):
         def on_app_change(active):
@@ -541,7 +525,23 @@ class KeyForgeApp:
                 self.rules_manager.set_controls_state(False)
                 self.app_focus_component.set_controls_state(False)
             else:
-                messagebox.showerror("Error", error)
+                self._show_start_error(error)
+
+    def _show_start_error(self, error):
+        """Traduce el error de key_handler.start() y agrega ayuda extra en Linux"""
+        tr = self.config_manager.tr
+        err_title = tr.get("error_title", "Error")
+        err_msg = tr.get(error, error)
+
+        if error == "error_admin_required" and sys.platform.startswith('linux'):
+            err_msg += "\n\n" + tr.get(
+                "error_admin_required_linux_hint",
+                "En Linux esto normalmente se soluciona dando acceso a tu "
+                "usuario a los dispositivos de entrada (grupo 'input' + regla "
+                "udev), sin necesidad de ejecutar como root. Revisa el README."
+            )
+
+        messagebox.showerror(err_title, err_msg)
 
         # NUEVO: Actualizar el icono minimizado si está visible
         if self.is_minimized and self.minimized_window:
