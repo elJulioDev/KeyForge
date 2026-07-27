@@ -1,0 +1,31 @@
+# Entornos virtuales
+venv/
+env/
+.venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Config local / logs (se regenera con DEFAULT_CONFIG en constants.py)
+data/config.json
+*.log
+logs/
+
+# Editor / SO
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Empaquetado
+*.spec
+KeyForge.exe
+KeyForge_linux
