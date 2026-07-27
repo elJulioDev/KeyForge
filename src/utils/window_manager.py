@@ -64,17 +64,22 @@ class WindowManager:
         """
         Fuerza a 'window' a mostrarse por encima de otras ventanas de la app.
 
-        En Linux, un root con overrideredirect + topmost permanente hace que
-        varios Window Managers dejen los Toplevel (diálogos, popups) por
-        debajo del root, aunque el diálogo también pida topmost. Este método
-        agrega el hint EWMH de tipo 'dialog' (solo X11) y reintenta el lift
-        unos milisegundos después, para cubrir WMs que ignoran el primer
-        raise mientras la ventana aún se está mapeando.
+        Cada paso va en su propio try/except: en Linux hay mucha variedad de
+        WM/compositores y no todos soportan los mismos hints (por ejemplo
+        '-type dialog' es X11 puro, puede fallar bajo Wayland). Si alguno
+        falla no debe frenar la creación del diálogo ni dejarlo a medio
+        inicializar con un grab_set() colgado.
         """
         if parent is not None:
-            window.transient(parent)
+            try:
+                window.transient(parent)
+            except Exception:
+                pass
 
-        window.attributes('-topmost', True)
+        try:
+            window.attributes('-topmost', True)
+        except Exception:
+            pass
 
         if sys.platform.startswith('linux'):
             try:
@@ -82,8 +87,26 @@ class WindowManager:
             except Exception:
                 pass
 
-        window.lift()
-        window.focus_force()
+        try:
+            window.lift()
+            window.focus_force()
+        except Exception:
+            pass
 
         for delay in (10, 60, 150):
-            window.after(delay, window.lift)
+            try:
+                window.after(delay, window.lift)
+            except Exception:
+                pass
+
+    def safe_grab_set(self, window):
+        """
+        grab_set() falla con TclError si la ventana todavía no es 'viewable'
+        (puede pasar justo después de deiconify() en algunos WM). En vez de
+        dejar la excepción sin capturar -lo que deja el diálogo abierto pero
+        sin inputs- reintenta una vez en el próximo ciclo de eventos.
+        """
+        try:
+            window.grab_set()
+        except Exception:
+            window.after(50, lambda: window.grab_set() if window.winfo_exists() else None)
