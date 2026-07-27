@@ -417,7 +417,7 @@ class CommonKeysWindow:
         self.window_manager.center_and_resize(self.window)
         # Aseguramos que quede por encima del root (fix stacking en Linux)
         self.window_manager.elevate(self.window, parent)
-        self.window.grab_set()
+        self.window_manager.safe_grab_set(self.window)
 
     def _create_content(self):
         # ... (El contenido de _create_content y _get_common_keys_text se mantiene IGUAL) ...

@@ -226,7 +226,7 @@ class RuleDialog:
         self.window_manager.center_and_resize(self.dialog)
         # Aseguramos que quede por encima del root (fix stacking en Linux)
         self.window_manager.elevate(self.dialog, parent)
-        self.dialog.grab_set()
+        self.window_manager.safe_grab_set(self.dialog)
     
     def _create_ui(self):
         main_frame = ttk.Frame(self.dialog, padding=20)

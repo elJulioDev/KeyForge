@@ -88,12 +88,19 @@ class KeyForgeApp:
 
     def _create_window(self, theme_name):
         self.root = ttk.Window(themename=theme_name)
-        self.root.overrideredirect(True)
+        # overrideredirect (ventana sin decoración, chrome custom) solo en
+        # Windows. En Linux/X11/Wayland una ventana root override-redirect
+        # queda en una capa "siempre arriba" que muchos WM/compositores
+        # (sobre todo vía XWayland) no reordenan aunque los diálogos pidan
+        # -topmost y se hagan lift() repetidos: los Toplevel (reglas,
+        # detección de teclas, messagebox de errores) terminan render
+        # izándose por detrás del root, invisibles, y la app "parece"
+        # trabada porque el diálogo modal sigue ahí (con grab_set activo)
+        # esperando un input que el usuario no puede ver ni dar.
+        if sys.platform == 'win32':
+            self.root.overrideredirect(True)
         self.root.title("KeyForge")
         self.root.resizable(False, False)
-        # NOTA: sin -topmost permanente. En Linux, dejar el root siempre
-        # encima impedía que los diálogos (Toplevel) se mostraran por
-        # encima de la ventana principal. Ver WindowManager.elevate().
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.iconphoto(True, get_icon("wrench", 64, "#3B82F6"))
         self.root.withdraw()
