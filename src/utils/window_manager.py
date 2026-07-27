@@ -1,6 +1,7 @@
 """
 Utilidades para manejo de ventanas
 """
+import sys
 
 
 class WindowManager:
@@ -58,3 +59,31 @@ class WindowManager:
         # Aplicar geometría
         window.geometry(f"{req_w}x{req_h}+{x}+{y}")
         window.deiconify()  # Mostrar ventana
+
+    def elevate(self, window, parent=None):
+        """
+        Fuerza a 'window' a mostrarse por encima de otras ventanas de la app.
+
+        En Linux, un root con overrideredirect + topmost permanente hace que
+        varios Window Managers dejen los Toplevel (diálogos, popups) por
+        debajo del root, aunque el diálogo también pida topmost. Este método
+        agrega el hint EWMH de tipo 'dialog' (solo X11) y reintenta el lift
+        unos milisegundos después, para cubrir WMs que ignoran el primer
+        raise mientras la ventana aún se está mapeando.
+        """
+        if parent is not None:
+            window.transient(parent)
+
+        window.attributes('-topmost', True)
+
+        if sys.platform.startswith('linux'):
+            try:
+                window.attributes('-type', 'dialog')
+            except Exception:
+                pass
+
+        window.lift()
+        window.focus_force()
+
+        for delay in (10, 60, 150):
+            window.after(delay, window.lift)

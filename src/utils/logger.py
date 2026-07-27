@@ -185,11 +185,11 @@ class PerformanceLogger:
         
         if elapsed_ms > self.threshold_ms:
             self.logger.warning(
-                f"⚠️ Operación lenta: {self.operation_name} tomó {elapsed_ms:.2f}ms"
+                f"Operación lenta: {self.operation_name} tomó {elapsed_ms:.2f}ms"
             )
         else:
             self.logger.debug(
-                f"✓ {self.operation_name}: {elapsed_ms:.3f}ms"
+                f"OK {self.operation_name}: {elapsed_ms:.3f}ms"
             )
 
 
