@@ -110,7 +110,7 @@ class WindowEventMonitor:
         )
         
         if not self.hook_handle:
-            print("❌ Error: No se pudo registrar WinEventHook")
+            print("Error: No se pudo registrar WinEventHook")
             self.running = False
             return
         

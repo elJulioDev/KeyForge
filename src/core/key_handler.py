@@ -208,7 +208,7 @@ class KeyHandler:
     def handle_key_event(self, e) -> bool:
         """
         Maneja todos los eventos de teclado capturados por el hook.
-        Búsqueda O(1) con hash map - ULTRA RÁPIDA ⚡
+        Búsqueda O(1) con hash map - latencia mínima
         """
         # Benchmark de latencia (opcional)
         start = time.perf_counter() if __debug__ else None
@@ -222,7 +222,7 @@ class KeyHandler:
             if e.name in self._active_keys:
                 return True
             
-            # 🚀 BÚSQUEDA O(1) - La magia está aquí
+            # BÚSQUEDA O(1) - La magia está aquí
             rule = self._rules_map.get(e.name)
             
             if not rule:
