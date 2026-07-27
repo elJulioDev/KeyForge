@@ -5,6 +5,8 @@ Optimizado para latencia mínima
 
 import keyboard
 import time
+import sys
+import os
 from typing import Dict, List, Optional, Tuple
 
 # Logger profesional (se importará del módulo utils)
@@ -14,6 +16,38 @@ try:
 except ImportError:
     import logging
     logger = logging.getLogger(__name__)
+
+
+def _patch_keyboard_linux_root_check():
+    """
+    keyboard._nixcommon.ensure_root() exige os.geteuid() == 0 sin mirar
+    los permisos reales de /dev/uinput. Con la regla udev + grupo 'input'
+    (ver README), el acceso real ya existe aunque no seamos root — el
+    chequeo de la librería es innecesariamente estricto para ese caso.
+    Lo reemplazamos por uno que valida acceso real al dispositivo.
+    """
+    if not sys.platform.startswith('linux'):
+        return
+    try:
+        import keyboard._nixcommon as _nixcommon
+
+        def _ensure_device_access():
+            if os.geteuid() == 0:
+                return
+            if os.access('/dev/uinput', os.W_OK):
+                return
+            raise ImportError(
+                "Sin acceso a /dev/uinput. Falta el grupo 'input' o la regla "
+                "udev (ver README, sección 'Linux permissions'), o falta "
+                "cerrar sesión tras agregarte al grupo."
+            )
+
+        _nixcommon.ensure_root = _ensure_device_access
+    except Exception as e:
+        logger.warning(f"No se pudo parchear el chequeo de root de 'keyboard': {e}")
+
+
+_patch_keyboard_linux_root_check()
 
 
 class KeyRule:
