@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 # --- Versión y Repositorio ---
-CURRENT_VERSION = "1.4.0" 
+CURRENT_VERSION = "1.5.0"
 GITHUB_REPO_OWNER = "elJulioDev"
 GITHUB_REPO_NAME = "KeyForge"
 
