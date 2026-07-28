@@ -101,6 +101,107 @@ def _patch_keyboard_dumpkeys_cache():
 _patch_keyboard_dumpkeys_cache()
 
 
+def _patch_keyboard_linux_real_suppress():
+    """
+    La librería 'keyboard' documenta (README propio): "Key
+    suppression/blocking only available on Windows". En Linux
+    _nixkeyboard.listen() lee /dev/input/eventN de forma pasiva y
+    descarta el valor de retorno del callback -> la tecla original
+    SIEMPRE llega al sistema, sin importar si hay una regla que la
+    reemplaza. Resultado: "A"->"S" escribe "AS", no "S".
+
+    Fix real (lo que en Windows hace el driver, aquí lo hacemos a mano):
+      1. EVIOCGRAB sobre cada dispositivo físico de teclado: deja de
+         entregarle eventos a nadie más (Wayland/X11 incluidos).
+      2. Reinyectamos por el dispositivo virtual (uinput) toda tecla
+         que el callback NO bloquee, para no perder el resto del teclado.
+
+    De paso, evita el `exit()` que la librería llama dentro del hilo de
+    lectura cuando un dispositivo da "Permission denied" (p.ej. algún
+    evento ACPI tipo botón de energía sin acceso): ahora ese dispositivo
+    simplemente se ignora en vez de imprimir el aviso y matar su hilo.
+    """
+    if not sys.platform.startswith('linux'):
+        return
+    try:
+        import fcntl
+        import keyboard._nixcommon as _nixcommon
+        import keyboard._nixkeyboard as _nixkeyboard
+
+        EVIOCGRAB = 0x40044590
+
+        def _safe_grabbed_input_file(self):
+            if self._input_file is None:
+                try:
+                    self._input_file = open(self.path, 'rb')
+                except IOError as e:
+                    if e.strerror == 'Permission denied':
+                        logger.warning(f"Sin acceso a {self.path}, se ignora ese dispositivo.")
+                    else:
+                        logger.warning(f"No se pudo abrir {self.path}: {e}")
+                    return None
+
+                if self.path != 'uinput Fake Device':
+                    try:
+                        fcntl.ioctl(self._input_file, EVIOCGRAB, 1)
+                    except OSError as e:
+                        logger.warning(f"No se pudo reservar {self.path} (EVIOCGRAB): {e}")
+
+                import atexit as _atexit
+                def try_close():
+                    try:
+                        self._input_file.close()
+                    except Exception:
+                        pass
+                _atexit.register(try_close)
+            return self._input_file
+
+        _nixcommon.EventDevice.input_file = property(_safe_grabbed_input_file)
+
+        def _passthrough_listen(callback):
+            _nixkeyboard.build_device()
+            _nixkeyboard.build_tables()
+            device = _nixkeyboard.device
+
+            while True:
+                time_, type_, code, value, device_id = device.read_event()
+                if type_ != _nixcommon.EV_KEY:
+                    continue
+
+                scan_code = code
+                event_type = _nixkeyboard.KEY_DOWN if value else _nixkeyboard.KEY_UP
+
+                pressed_modifiers_tuple = tuple(sorted(_nixkeyboard.pressed_modifiers))
+                names = (_nixkeyboard.to_name[(scan_code, pressed_modifiers_tuple)]
+                         or _nixkeyboard.to_name[(scan_code, ())] or ['unknown'])
+                name = names[0]
+
+                if name in _nixkeyboard.all_modifiers:
+                    if event_type == _nixkeyboard.KEY_DOWN:
+                        _nixkeyboard.pressed_modifiers.add(name)
+                    else:
+                        _nixkeyboard.pressed_modifiers.discard(name)
+
+                is_keypad = scan_code in _nixkeyboard.keypad_scan_codes
+                event = _nixkeyboard.KeyboardEvent(
+                    event_type=event_type, scan_code=scan_code, name=name,
+                    time=time_, device=device_id, is_keypad=is_keypad,
+                    modifiers=pressed_modifiers_tuple,
+                )
+
+                # Si el callback no bloquea la tecla, la reinyectamos
+                # nosotros mismos: el grab se la quitó al sistema.
+                if callback(event) is not False:
+                    device.write_event(_nixcommon.EV_KEY, scan_code, value)
+
+        _nixkeyboard.listen = _passthrough_listen
+    except Exception as e:
+        logger.warning(f"No se pudo activar el suppress real en Linux: {e}")
+
+
+_patch_keyboard_linux_real_suppress()
+
+
 class KeyRule:
     """Representa una regla individual de remapeo"""
     
