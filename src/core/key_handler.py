@@ -30,6 +30,7 @@ def _patch_keyboard_linux_root_check():
         return
     try:
         import keyboard._nixcommon as _nixcommon
+        import keyboard._nixkeyboard as _nixkeyboard
 
         def _ensure_device_access():
             if os.geteuid() == 0:
@@ -42,7 +43,11 @@ def _patch_keyboard_linux_root_check():
                 "cerrar sesión tras agregarte al grupo."
             )
 
+        # _nixkeyboard hizo "from ._nixcommon import ensure_root" al importarse,
+        # queda un nombre propio en su namespace. Parchear solo _nixcommon no
+        # lo toca; hay que parchear ambos.
         _nixcommon.ensure_root = _ensure_device_access
+        _nixkeyboard.ensure_root = _ensure_device_access
     except Exception as e:
         logger.warning(f"No se pudo parchear el chequeo de root de 'keyboard': {e}")
 
