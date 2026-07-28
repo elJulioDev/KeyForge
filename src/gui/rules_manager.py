@@ -39,9 +39,9 @@ class RulesManagerComponent:
         btn_frame = ttk.Frame(toolbar)
         btn_frame.pack(side="right")
 
-        icon_delete = get_icon("trash-2", 14, "#FFFFFF")
-        icon_edit = get_icon("pencil", 14, "#FFFFFF")
-        icon_add = get_icon("plus", 14, "#FFFFFF")
+        icon_delete = get_icon("trash-2", 18, "#FFFFFF")
+        icon_edit = get_icon("pencil", 18, "#FFFFFF")
+        icon_add = get_icon("plus", 18, "#FFFFFF")
 
         btn_delete = ttk.Button(
             btn_frame,
@@ -80,28 +80,31 @@ class RulesManagerComponent:
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical")
         scrollbar.pack(side="right", fill="y")
         
-        columns = ("source", "target", "mode", "status")
+        columns = ("source", "target", "mode")
         self.tree = ttk.Treeview(
             tree_frame,
             columns=columns,
-            show="headings",
+            show="tree headings",
             selectmode="browse",
             yscrollcommand=scrollbar.set
         )
-        
+
+        self.tree.heading("#0", text=self.tr.get("status_label", "Status"))
+        self.tree.column("#0", width=60, anchor="center", stretch=False)
+
         self.tree.heading("source", text=self.tr.get("replace_label", "Input").replace(":", ""))
         self.tree.heading("target", text=self.tr.get("with_label", "Output").replace(":", ""))
         self.tree.heading("mode", text=self.tr.get("mode_title", "Mode"))
-        self.tree.heading("status", text=self.tr.get("status_label", "Status"))
 
         colors = ttk.Style().colors
+        self.icon_enabled = get_icon("check", 16, colors.success)
+        self.icon_disabled = get_icon("x", 16, colors.danger)
         self.tree.tag_configure("rule-enabled", foreground=colors.success)
         self.tree.tag_configure("rule-disabled", foreground=colors.danger)
         
         self.tree.column("source", width=100, anchor="center")
         self.tree.column("target", width=100, anchor="center")
         self.tree.column("mode", width=100, anchor="center")
-        self.tree.column("status", width=60, anchor="center")
         
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.tree.yview)
@@ -136,14 +139,13 @@ class RulesManagerComponent:
         
         for rule in rules:
             mode_text = self.tr.get("hold", "Hold") if rule.mode == "hold" else self.tr.get("toggle", "Toggle")
-            status_text = "✓" if rule.enabled else "✕"
+            status_icon = self.icon_enabled if rule.enabled else self.icon_disabled
             status_tag = "rule-enabled" if rule.enabled else "rule-disabled"
             
-            self.tree.insert("", "end", values=(
+            self.tree.insert("", "end", image=status_icon, values=(
                 rule.key_to_replace.upper(),
                 rule.replacement_key.upper(),
-                mode_text,
-                status_text
+                mode_text
             ), tags=(status_tag,))
             
     def _add_rule_dialog(self):
@@ -232,7 +234,7 @@ class RuleDialog:
         main_frame = ttk.Frame(self.dialog, padding=20)
         main_frame.pack(fill="both", expand=True)
 
-        search_icon = get_icon("search", 14, ttk.Style().colors.secondary)
+        search_icon = get_icon("search", 18, ttk.Style().colors.secondary)
 
         # Inputs
         ttk.Label(main_frame, text=self.tr.get("replace_label", "Key to Replace:"), bootstyle="primary").pack(anchor="w")
