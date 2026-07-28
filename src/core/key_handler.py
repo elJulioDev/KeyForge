@@ -55,6 +55,52 @@ def _patch_keyboard_linux_root_check():
 _patch_keyboard_linux_root_check()
 
 
+def _patch_keyboard_dumpkeys_cache():
+    """
+    'dumpkeys' necesita un descriptor de consola real (VT), algo que no
+    existe dentro de una terminal gráfica (Konsole/Wayland/X11). Ahí
+    falla con "Couldn't get a file descriptor referring to the console",
+    incluso teniendo permisos sobre /dev/input y /dev/uinput — es una
+    restricción del kernel (CAP_SYS_TTY_CONFIG), no arreglable con udev.
+
+    Solución: cachear la salida de 'dumpkeys' una sola vez (generada con
+    sudo, o desde una TTY real con Ctrl+Alt+F3) y servirla desde disco en
+    cada arranque normal, sin volver a invocar el binario.
+    """
+    if not sys.platform.startswith('linux'):
+        return
+    try:
+        from ..config.constants import CONFIG_DIR
+        import keyboard._nixkeyboard as _nixkeyboard
+
+        cache_dir = CONFIG_DIR / "dumpkeys_cache"
+        cache_files = {
+            ('dumpkeys', '--keys-only'): cache_dir / "keys_only.txt",
+            ('dumpkeys', '--long-info'): cache_dir / "long_info.txt",
+        }
+        original_check_output = _nixkeyboard.check_output
+
+        def _cached_check_output(cmd, *args, **kwargs):
+            path = cache_files.get(tuple(cmd))
+            if path is not None:
+                if path.exists():
+                    return path.read_text(encoding='utf-8')
+                # Primer intento: probar el binario real (root o TTY real)
+                # y, si funciona, guardar el resultado para la próxima vez.
+                output = original_check_output(cmd, *args, **kwargs)
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                path.write_text(output, encoding='utf-8')
+                return output
+            return original_check_output(cmd, *args, **kwargs)
+
+        _nixkeyboard.check_output = _cached_check_output
+    except Exception as e:
+        logger.warning(f"No se pudo activar la caché de 'dumpkeys': {e}")
+
+
+_patch_keyboard_dumpkeys_cache()
+
+
 class KeyRule:
     """Representa una regla individual de remapeo"""
     
