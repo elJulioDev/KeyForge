@@ -29,3 +29,6 @@ Thumbs.db
 *.spec
 KeyForge.exe
 KeyForge_linux
+
+data/dumpkeys_cache/
+data/config.json
