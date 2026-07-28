@@ -70,7 +70,7 @@ class AccessibilityComponent:
             
             ttk.Radiobutton(
                 lang_frame,
-                text=f"{'🇪🇸' if lang_code == 'es' else '🇬🇧'} {lang_display_name}",
+                text=lang_display_name,
                 variable=self.lang_var,
                 value=lang_code,
                 command=self._on_language_change,

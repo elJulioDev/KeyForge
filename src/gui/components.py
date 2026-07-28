@@ -271,7 +271,7 @@ class AppFocusComponent:
         self.app_combo.grid(row=0, column=1, padx=(8, 4), pady=4, sticky="ew")
         self.app_combo.bind("<<ComboboxSelected>>", lambda e: self.on_selected())
         
-        icon_refresh = get_icon("refresh-cw", 14, ttk.Style().colors.info)
+        icon_refresh = get_icon("refresh-cw", 18, ttk.Style().colors.info)
         self.btn_refresh = ttk.Button(
             app_select_container,
             image=icon_refresh,
@@ -326,11 +326,11 @@ class ControlButtonsComponent:
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x", padx=20, pady=(0, 10))
         
-        self.icon_play = get_icon("play", 14, "#FFFFFF")
-        self.icon_pause = get_icon("pause", 14, "#FFFFFF")
-        icon_save = get_icon("save", 14, "#FFFFFF")
-        icon_minimize = get_icon("minus", 14, "#FFFFFF")
-        icon_exit = get_icon("x", 14, "#FFFFFF")
+        self.icon_play = get_icon("play", 18, "#FFFFFF")
+        self.icon_pause = get_icon("pause", 18, "#FFFFFF")
+        icon_save = get_icon("save", 18, "#FFFFFF")
+        icon_minimize = get_icon("minus", 18, "#FFFFFF")
+        icon_exit = get_icon("x", 18, "#FFFFFF")
 
         # Botón principal de activar/desactivar (Grande)
         self.toggle_btn = ttk.Button(

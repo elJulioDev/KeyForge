@@ -120,7 +120,7 @@ class MinimizedWindow:
         self._round_rect(canvas, k_pad, k_pad, s-k_pad, s-k_pad, 8, fill=key_fill, outline=key_border, width=1) 
         
         # Icono (Usa color dinámico)
-        wrench_icon = get_icon("wrench", 32, icon_color)
+        wrench_icon = get_icon("wrench", 36, icon_color)
         canvas.create_image(s/2, s/2, image=wrench_icon)
         
         # Indicador de estado (LED)

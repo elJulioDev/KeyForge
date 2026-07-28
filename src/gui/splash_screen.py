@@ -90,7 +90,7 @@ class SplashScreen:
         )
         
         # --- TÍTULO (Color adaptativo) ---
-        title_icon = get_icon("wrench", 22, fg_color)
+        title_icon = get_icon("wrench", 26, fg_color)
         self.canvas.create_image(w//2 - 62, 50, image=title_icon, anchor="e")
         self.canvas.title_icon = title_icon  # referencia viva
         self.canvas.create_text(

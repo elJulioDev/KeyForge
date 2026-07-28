@@ -39,9 +39,9 @@ class RulesManagerComponent:
         btn_frame = ttk.Frame(toolbar)
         btn_frame.pack(side="right")
 
-        icon_delete = get_icon("trash-2", 18, "#FFFFFF")
-        icon_edit = get_icon("pencil", 18, "#FFFFFF")
-        icon_add = get_icon("plus", 18, "#FFFFFF")
+        icon_delete = get_icon("trash-2", 22, "#FFFFFF")
+        icon_edit = get_icon("pencil", 22, "#FFFFFF")
+        icon_add = get_icon("plus", 22, "#FFFFFF")
 
         btn_delete = ttk.Button(
             btn_frame,
@@ -97,8 +97,8 @@ class RulesManagerComponent:
         self.tree.heading("mode", text=self.tr.get("mode_title", "Mode"))
 
         colors = ttk.Style().colors
-        self.icon_enabled = get_icon("check", 16, colors.success)
-        self.icon_disabled = get_icon("x", 16, colors.danger)
+        self.icon_enabled = get_icon("check", 20, colors.success)
+        self.icon_disabled = get_icon("x", 20, colors.danger)
         self.tree.tag_configure("rule-enabled", foreground=colors.success)
         self.tree.tag_configure("rule-disabled", foreground=colors.danger)
         
@@ -234,7 +234,7 @@ class RuleDialog:
         main_frame = ttk.Frame(self.dialog, padding=20)
         main_frame.pack(fill="both", expand=True)
 
-        search_icon = get_icon("search", 18, ttk.Style().colors.secondary)
+        search_icon = get_icon("search", 22, ttk.Style().colors.secondary)
 
         # Inputs
         ttk.Label(main_frame, text=self.tr.get("replace_label", "Key to Replace:"), bootstyle="primary").pack(anchor="w")

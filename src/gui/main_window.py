@@ -88,18 +88,9 @@ class KeyForgeApp:
 
     def _create_window(self, theme_name):
         self.root = ttk.Window(themename=theme_name)
-        # overrideredirect (ventana sin decoración, chrome custom) solo en
-        # Windows. En Linux/X11/Wayland una ventana root override-redirect
-        # queda en una capa "siempre arriba" que muchos WM/compositores
-        # (sobre todo vía XWayland) no reordenan aunque los diálogos pidan
-        # -topmost y se hagan lift() repetidos: los Toplevel (reglas,
-        # detección de teclas, messagebox de errores) terminan render
-        # izándose por detrás del root, invisibles, y la app "parece"
-        # trabada porque el diálogo modal sigue ahí (con grab_set activo)
-        # esperando un input que el usuario no puede ver ni dar.
-        if sys.platform == 'win32':
-            self.root.overrideredirect(True)
-        self.root.title("KeyForge")
+        # Sin overrideredirect: usamos la barra de título nativa del SO
+        # para arrastrar la ventana. Ahí van nombre y versión.
+        self.root.title(f"KeyForge v{CURRENT_VERSION}")
         self.root.resizable(False, False)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.iconphoto(True, get_icon("wrench", 64, "#3B82F6"))
@@ -160,26 +151,7 @@ class KeyForgeApp:
     def _create_ui_structure(self):
         tr = self.config_manager.tr
         
-        # --- 1. HEADER (Solo Título y Arrastre) ---
-        header = ttk.Frame(self.root, bootstyle="secondary")
-        header.pack(fill="x", ipady=5)
-        
-        # Título (sin botones de ventana)
-        from .. import __version__
-        title_icon = get_icon("wrench", 16, "#F0F0F0")
-        title = ttk.Label(
-            header, image=title_icon, text=f" KeyForge v{__version__}",
-            compound="left", font=("Segoe UI", 12, "bold"), bootstyle="inverse-secondary"
-        )
-        title.image = title_icon  # referencia viva (Tkinter no la retiene sola)
-        title.pack(side="left", padx=15)
-
-        # Arrastre (Vinculado al header y al título)
-        for w in [header, title]:
-            w.bind("<Button-1>", lambda e: self.window_manager.start_drag(e, self.root))
-            w.bind("<B1-Motion>", lambda e: self.window_manager.drag(e, self.root))
-
-        # --- 2. CUERPO PRINCIPAL (Pestañas) ---
+        # --- CUERPO PRINCIPAL (Pestañas) ---
         self.notebook = ttk.Notebook(self.root, bootstyle="primary")
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
         
