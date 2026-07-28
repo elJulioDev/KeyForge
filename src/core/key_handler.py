@@ -158,6 +158,21 @@ def _patch_keyboard_linux_real_suppress():
 
         _nixcommon.EventDevice.input_file = property(_safe_grabbed_input_file)
 
+        import struct as _struct
+        import threading as _threading
+
+        def _safe_read_event(self):
+            f = self.input_file
+            if f is None:
+                # Dispositivo sin acceso: este hilo no puede leer nada,
+                # se queda inactivo en vez de reventar con AttributeError.
+                _threading.Event().wait()
+            data = f.read(_struct.calcsize(_nixcommon.event_bin_format))
+            seconds, microseconds, type_, code, value = _struct.unpack(_nixcommon.event_bin_format, data)
+            return seconds + microseconds / 1e6, type_, code, value, self.path
+
+        _nixcommon.EventDevice.read_event = _safe_read_event
+
         def _passthrough_listen(callback):
             _nixkeyboard.build_device()
             _nixkeyboard.build_tables()
