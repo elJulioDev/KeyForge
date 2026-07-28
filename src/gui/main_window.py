@@ -512,6 +512,8 @@ class KeyForgeApp:
             self.control_buttons.set_toggle_state(False)
             self.rules_manager.set_controls_state(True)
             self.app_focus_component.set_controls_state(True)
+            if self.is_minimized and self.minimized_window:
+                self.minimized_window.update_visuals(False)
         else:
             # Lógica original para iniciar
             if not self.key_handler.get_rules():
@@ -531,6 +533,8 @@ class KeyForgeApp:
                 self.control_buttons.set_toggle_state(True)
                 self.rules_manager.set_controls_state(False)
                 self.app_focus_component.set_controls_state(False)
+                if self.is_minimized and self.minimized_window:
+                    self.minimized_window.update_visuals(True)
             else:
                 self._show_start_error(error)
 
@@ -602,6 +606,11 @@ class KeyForgeApp:
     def _on_close(self):
         if self.key_handler.is_active(): self.key_handler.stop()
         self.root.destroy()
+        # Salida dura: con el grab exclusivo de teclado (EVIOCGRAB) no nos
+        # arriesgamos a que algún hilo/descriptor deje el proceso colgado
+        # en segundo plano. El kernel libera el grab igual al morir el proceso.
+        import os
+        os._exit(0)
 
     def run(self):
         self.root.mainloop()
