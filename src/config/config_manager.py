@@ -4,6 +4,7 @@ Gestor de configuración y traducciones
 import json
 from pathlib import Path
 from .constants import CONFIG_FILE, LANG_FILE, DEFAULT_CONFIG
+from .translation_manager import TranslationManager
 
 
 class ConfigManager:
@@ -11,9 +12,15 @@ class ConfigManager:
     
     def __init__(self):
         self.config = self.load_config()
-        self.translations = self.load_translations()
-        self.lang = self.config.get("lang", "es")
-        self.tr = self.translations.get(self.lang, self.translations.get('es', {}))
+        
+        # Inicializar TranslationManager
+        self.tr_manager = TranslationManager(LANG_FILE)
+        self.tr_manager.load()
+        self.tr_manager.current_lang = self.config.get("lang", "en")
+        
+        # Alias para backward compatibility temporal
+        # NOTA: Esto se eliminará cuando todos los componentes usen tr_manager.tr()
+        self.tr = self.tr_manager
     
     def load_config(self):
         """
@@ -32,15 +39,6 @@ class ConfigManager:
         except Exception as e:
             print(f"Error al cargar configuración: {e}")
             return DEFAULT_CONFIG.copy()
-    
-    def load_translations(self):
-        """Carga las traducciones desde lang.json"""
-        try:
-            with open(LANG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error al cargar traducciones: {e}")
-            return {"es": {}, "en": {}}
     
     def save_config(self, config_data):
         """
@@ -72,4 +70,4 @@ class ConfigManager:
     
     def get_translation(self, key):
         """Obtiene una traducción por clave"""
-        return self.tr.get(key, key)
+        return self.tr_manager.tr(key)

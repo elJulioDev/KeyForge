@@ -20,23 +20,18 @@ class AccessibilityComponent:
         "cyborg", "darkly", "solar", "superhero", "vapor"
     ]
     
-    # Mapeo de códigos de idioma a nombres completos
-    LANGUAGE_NAMES = {
-        "es": {"es": "Español", "en": "Spanish"},
-        "en": {"es": "Inglés", "en": "English"}
-    }
-    
-    def __init__(self, parent, tr, current_lang, current_theme, on_change_callback):
+    def __init__(self, parent, tr_manager, current_lang, current_theme, on_change_callback):
         """
         Args:
             parent: Widget padre
-            tr: Diccionario de traducciones
+            tr_manager: Instancia de TranslationManager
             current_lang: Idioma actual (código: 'es', 'en')
             current_theme: Tema actual
             on_change_callback: Función a llamar cuando cambia idioma o tema
         """
         self.parent = parent
-        self.tr = tr
+        self.tr_manager = tr_manager
+        self.tr = tr_manager
         self.on_change = on_change_callback
         
         self.lang_var = StringVar(value=current_lang)
@@ -54,40 +49,27 @@ class AccessibilityComponent:
         self.frame.pack(fill="both", expand=True)
         
         # --- SECCIÓN IDIOMA ---
-        lang_frame = ttk.Labelframe(
+        self.lang_frame = ttk.Labelframe(
             self.frame,
-            text=self.tr.get("language_label", "Language:"),
+            text=self.tr("language_label"),
             padding=15
         )
-        lang_frame.pack(fill="x", pady=(0, 15))
+        self.lang_frame.pack(fill="x", pady=(0, 15))
         
-        # Obtener idioma actual para mostrar nombres correctos
-        current_lang = self.lang_var.get()
-        
-        # Radio buttons para idiomas
-        for lang_code in ["es", "en"]:
-            lang_display_name = self.LANGUAGE_NAMES[lang_code][current_lang]
-            
-            ttk.Radiobutton(
-                lang_frame,
-                text=lang_display_name,
-                variable=self.lang_var,
-                value=lang_code,
-                command=self._on_language_change,
-                bootstyle="primary"
-            ).pack(anchor="w", pady=5)
+        # Radio buttons para idiomas (generados dinámicamente)
+        self._create_language_radios()
         
         # --- SECCIÓN TEMA ---
-        theme_frame = ttk.Labelframe(
+        self.theme_frame = ttk.Labelframe(
             self.frame,
-            text=self.tr.get("theme_label", "Theme:"),
+            text=self.tr("theme_label"),
             padding=15
         )
-        theme_frame.pack(fill="x", pady=(0, 15))
+        self.theme_frame.pack(fill="x", pady=(0, 15))
         
         # Combobox para temas
         self.theme_combo = ttk.Combobox(
-            theme_frame,
+            self.theme_frame,
             textvariable=self.theme_var,
             values=self._get_translated_themes(),
             state="readonly",
@@ -97,26 +79,44 @@ class AccessibilityComponent:
         self.theme_combo.bind("<<ComboboxSelected>>", lambda e: self._on_theme_change())
 
         # --- SECCIÓN ACTUALIZACIONES ---
-        update_frame = ttk.Labelframe(
+        self.update_frame = ttk.Labelframe(
             self.frame,
-            text=self.tr.get("updates_title", "Updates"),
+            text=self.tr("updates_title"),
             padding=15
         )
-        update_frame.pack(fill="x", pady=(0, 15))
+        self.update_frame.pack(fill="x", pady=(0, 15))
 
         self.check_btn = ttk.Button(
-            update_frame,
-            text=self.tr.get("check_updates_btn", "Check for Updates"),
+            self.update_frame,
+            text=self.tr("check_updates_btn"),
             command=self._check_updates,
             bootstyle="primary",
             width=25
         )
         self.check_btn.pack()
     
+    def _create_language_radios(self):
+        """Crea radio buttons de idioma dinámicamente desde meta"""
+        languages = self.tr_manager.get_available_languages()
+        
+        for lang_code in languages.keys():
+            lang_display_name = self.tr_manager.get_language_name(
+                lang_code, self.tr_manager.current_lang
+            )
+            
+            ttk.Radiobutton(
+                self.lang_frame,
+                text=lang_display_name,
+                variable=self.lang_var,
+                value=lang_code,
+                command=self._on_language_change,
+                bootstyle="primary"
+            ).pack(anchor="w", pady=5)
+    
     def _check_updates(self):
         """Lógica del botón de actualizar"""
         original_text = self.check_btn.cget("text")
-        self.check_btn.configure(text=self.tr.get("checking_updates", "Checking..."), state="disabled")
+        self.check_btn.configure(text=self.tr("checking_updates"), state="disabled")
         self.frame.update() # Forzar refresco de UI
 
         has_update, data = self.updater.check_for_updates()
@@ -125,16 +125,16 @@ class AccessibilityComponent:
 
         if has_update:
             # Data es un dict con {version, url, body}
-            msg = self.tr.get("update_available_msg", "New version available").format(version=data['version'])
-            if askyesno(self.tr.get("update_available_title", "Update Available"), msg):
+            msg = self.tr("update_available_msg", version=data['version'])
+            if askyesno(self.tr("update_available_title"), msg):
                 self.updater.open_download_page(data['url'])
         else:
             # Data es el string de la versión actual o un mensaje de error
             if "error" in str(data).lower() or "exception" in str(data).lower():
-                showerror(self.tr.get("error_title", "Error"), self.tr.get("update_error_msg", "Error updating"))
+                showerror(self.tr("error_title"), self.tr("update_error_msg"))
             else:
-                showinfo(self.tr.get("title", "KeyForge"), self.tr.get("no_update_msg", "Up to date").format(version=data))
-
+                showinfo(self.tr("title"), self.tr("no_update_msg", version=data))
+    
     def _get_translated_themes(self):
         """Retorna lista de temas (Nombres originales capitalizados)"""
         return [theme.capitalize() for theme in self.AVAILABLE_THEMES]
@@ -169,3 +169,18 @@ class AccessibilityComponent:
     def _get_display_name_from_code(self, theme_code):
         """Devuelve el nombre para mostrar dado un código"""
         return theme_code.capitalize()
+    
+    def update_translations(self):
+        """Actualiza las traducciones del componente"""
+        # Secciones
+        self.lang_frame.config(text=self.tr("language_label"))
+        self.theme_frame.config(text=self.tr("theme_label"))
+        self.update_frame.config(text=self.tr("updates_title"))
+        
+        # Botón de actualizaciones
+        self.check_btn.config(text=self.tr("check_updates_btn"))
+        
+        # Recrear radio buttons de idioma con nombres en el nuevo idioma
+        for child in self.lang_frame.winfo_children():
+            child.destroy()
+        self._create_language_radios()

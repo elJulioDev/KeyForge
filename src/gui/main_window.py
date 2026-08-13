@@ -24,6 +24,7 @@ class KeyForgeApp:
     def __init__(self):
         self.logger = get_logger()
         self.config_manager = ConfigManager()
+        self.tr_manager = self.config_manager.tr_manager
 
         # Configuramos tema antes de crear ventana
         current_theme = self.config_manager.config.get("theme", "darkly")
@@ -35,11 +36,11 @@ class KeyForgeApp:
         # Pasamos el root para que el splash herede el tema
         self.splash = SplashScreen(
             self.root, 
-            tr_dict=self.config_manager.tr,
+            tr_manager=self.tr_manager,
             title="KeyForge", 
             version=CURRENT_VERSION
         )
-        self.splash.update_step(5, self.config_manager.tr.get("splash_config", "Cargando configuración..."))
+        self.splash.update_step(5, self.tr_manager.tr("splash_config"))
 
         self.app_monitor = AppMonitor()
         self.key_handler = KeyHandler(self.app_monitor)
@@ -51,7 +52,7 @@ class KeyForgeApp:
         self.is_restarting = False
         
         # 2. Configuraciones iniciales
-        self.splash.update_step(20, self.config_manager.tr.get("splash_gui", "Inicializando componentes..."))
+        self.splash.update_step(20, self.tr_manager.tr("splash_gui"))
         self.key_handler.set_tk_root(self.root)
 
         self._create_ui_structure()
@@ -100,19 +101,19 @@ class KeyForgeApp:
         """Tareas pesadas y cierre del splash"""
     
         if hasattr(self, 'splash'): 
-            self.splash.update_step(40, self.config_manager.tr.get("splash_scan", "Escaneando sistema..."))
+            self.splash.update_step(40, self.tr_manager.tr("splash_scan"))
         self._finalize_window_layout()
     
         if hasattr(self, 'splash'): 
-            self.splash.update_step(60, self.config_manager.tr.get("splash_rules", "Cargando reglas..."))
+            self.splash.update_step(60, self.tr_manager.tr("splash_rules"))
         self._load_heavy_logic()
     
         if hasattr(self, 'splash'): 
-            self.splash.update_step(80, self.config_manager.tr.get("splash_monitors", "Iniciando monitores..."))
+            self.splash.update_step(80, self.tr_manager.tr("splash_monitors"))
         self._init_monitoring()
     
         if hasattr(self, 'splash'): 
-            self.splash.update_step(100, self.config_manager.tr.get("splash_done", "¡Listo!"))
+            self.splash.update_step(100, self.tr_manager.tr("splash_done"))
     
         self.root.after(500, self._finish_loading)
     
@@ -149,7 +150,7 @@ class KeyForgeApp:
         self.root.geometry(f"{final_w}x{final_h}+{x}+{y}")
 
     def _create_ui_structure(self):
-        tr = self.config_manager.tr
+        tr = self.tr_manager
         
         # --- CUERPO PRINCIPAL (Pestañas) ---
         self.notebook = ttk.Notebook(self.root, bootstyle="primary")
@@ -157,18 +158,19 @@ class KeyForgeApp:
         
         # Pestaña 1: Dashboard
         self.tab_dashboard = ttk.Frame(self.notebook, padding=15)
-        self.notebook.add(self.tab_dashboard, text=f" {tr.get('title', 'Dashboard')} ")
+        self.notebook.add(self.tab_dashboard, text=f" {tr('title')} ")
         
         # Pestaña 2: Reglas
         self.tab_rules = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(self.tab_rules, text=f" {tr.get('rules_title', 'Rules')} ")
+        self.notebook.add(self.tab_rules, text=f" {tr('rules_title')} ")
         
         # Pestaña 3: Accesibilidad
         self.tab_accessibility = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(self.tab_accessibility, text=f" {tr.get('accessibility_title', 'Accessibility')} ")
+        self.notebook.add(self.tab_accessibility, text=f" {tr('accessibility_title')} ")
 
         # --- CONTENIDO DASHBOARD ---
         self.status_component = StatusComponent(self.tab_dashboard, tr)
+        tr.subscribe(self.status_component)
         
         ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
         
@@ -176,6 +178,7 @@ class KeyForgeApp:
             self.tab_dashboard, tr, 
             self._refresh_windows_list, self._toggle_app_focus, self._on_app_selected
         )
+        tr.subscribe(self.app_focus_component)
         
         ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
 
@@ -187,12 +190,14 @@ class KeyForgeApp:
             on_minimize_callback=self._minimize_custom,
             on_exit_callback=self._on_close
         )
+        tr.subscribe(self.control_buttons)
 
         # --- CONTENIDO REGLAS ---
         self.rules_manager = RulesManagerComponent(
             self.tab_rules, tr,
             on_detect_key_callback=self._on_detect_key_request
         )
+        tr.subscribe(self.rules_manager)
         
         self.rules_manager.on_add_rule = self._add_rule_logic
         self.rules_manager.on_edit_rule = self._edit_rule_logic
@@ -209,6 +214,13 @@ class KeyForgeApp:
             current_theme,
             self._on_accessibility_change
         )
+        tr.subscribe(self.accessibility_component)
+
+    def _update_tab_labels(self):
+        """Actualiza títulos de las pestañas del notebook"""
+        self.notebook.tab(0, text=f" {self.tr_manager.tr('title')} ")
+        self.notebook.tab(1, text=f" {self.tr_manager.tr('rules_title')} ")
+        self.notebook.tab(2, text=f" {self.tr_manager.tr('accessibility_title')} ")
 
     # --- Lógica de Reglas ---
     
@@ -278,43 +290,15 @@ class KeyForgeApp:
             from ..config import CONFIG_FILE
             
             # 4. Mensaje de éxito TRADUCIDO
-            title = self.config_manager.tr.get("saved_title", "Configuration Saved")
+            title = self.tr_manager.tr("saved_title")
             
             # Obtenemos el template traducido (ej: "Guardado en:\n{configfile}")
-            msg_template = self.config_manager.tr.get("saved_msg", "Saved in:\n{configfile}")
+            msg_template = self.tr_manager.tr("saved_msg")
             
             # Reemplazamos el placeholder con la ruta real
             msg = msg_template.replace("{configfile}", str(CONFIG_FILE))
             
             messagebox.showinfo(title, msg)
-
-    def _add_rule_logic(self, rule_data):
-        success, error = self.key_handler.add_rule(
-            rule_data['key_to_replace'], rule_data['replacement_key'],
-            rule_data['mode'], rule_data['enabled']
-        )
-        if success:
-            self._refresh_rules_ui()
-        else:
-            # TRADUCIR TÍTULO Y MAPEAR ERROR
-            err_title = self.config_manager.tr.get("error_title", "Error")
-            # Traducir el mensaje de error que viene del backend (ver Paso 2)
-            err_msg = self.config_manager.tr.get(error, error) 
-            messagebox.showerror(err_title, err_msg)
-
-    def _edit_rule_logic(self, index, rule_data):
-        success, error = self.key_handler.update_rule(
-            index,
-            rule_data['key_to_replace'], rule_data['replacement_key'],
-            rule_data['mode'], rule_data['enabled']
-        )
-        if success:
-            self._refresh_rules_ui()
-        else:
-            # TRADUCIR TÍTULO Y MAPEAR ERROR
-            err_title = self.config_manager.tr.get("error_title", "Error")
-            err_msg = self.config_manager.tr.get(error, error)
-            messagebox.showerror(err_title, err_msg)
 
     def _init_monitoring(self):
         def on_app_change(active):
@@ -339,7 +323,7 @@ class KeyForgeApp:
     def _on_accessibility_change(self, setting_type, value):
         """
         Callback cuando cambia alguna configuración de accesibilidad.
-        Guarda automáticamente y reinicia la interfaz.
+        Idioma: hot-reload. Tema: reinicia la aplicación.
         """
         if hasattr(self, 'is_restarting') and self.is_restarting:
             return
@@ -360,9 +344,31 @@ class KeyForgeApp:
         
         # Guardar configuración
         if self.config_manager.save_config(config_update):
-            # Reiniciar la aplicación para aplicar cambios
-            self._restart_application()
+            if setting_type == "lang":
+                # HOT-RELOAD: Actualizar idioma sin reiniciar
+                self._reload_language(value)
+            else:
+                # Tema requiere recrear ventana
+                self._restart_application()
     
+    def _reload_language(self, new_lang):
+        """Recarga traducciones y actualiza la UI sin reiniciar"""
+        # Guardar pestaña actual y estado del polling
+        current_tab = self.notebook.index(self.notebook.select())
+        
+        # Notificar cambio de idioma (los componentes suscritos se actualizan)
+        changed = self.tr_manager.set_language(new_lang)
+        
+        # Actualizar títulos de pestañas
+        self._update_tab_labels()
+        
+        # Restaurar pestaña seleccionada
+        if current_tab:
+            self.notebook.select(current_tab)
+        
+        if changed:
+            self.logger.info(f"Idioma cambiado a: {new_lang}")
+
     def _restart_application(self):
         """Reinicia el proceso de la aplicación completamente"""
         if self.is_restarting:
@@ -490,10 +496,7 @@ class KeyForgeApp:
             # Lógica original para iniciar
             if not self.key_handler.get_rules():
                 # Si está minimizado y da error, mostramos un popup simple porque la ventana principal no se ve
-                if self.is_minimized:
-                    messagebox.showwarning("KeyForge", "Add at least one rule first.")
-                else:
-                    messagebox.showwarning("KeyForge", "Add at least one rule first.")
+                messagebox.showwarning("KeyForge", self.tr_manager.tr("no_rules_msg"))
                 return
             
             self.app_monitor.set_enforce_focus(self.app_focus_component.is_focus_enabled())
@@ -512,17 +515,12 @@ class KeyForgeApp:
 
     def _show_start_error(self, error):
         """Traduce el error de key_handler.start() y agrega ayuda extra en Linux"""
-        tr = self.config_manager.tr
-        err_title = tr.get("error_title", "Error")
-        err_msg = tr.get(error, error)
+        tr = self.tr_manager
+        err_title = tr("error_title")
+        err_msg = tr(error)
 
         if error == "error_admin_required" and sys.platform.startswith('linux'):
-            err_msg += "\n\n" + tr.get(
-                "error_admin_required_linux_hint",
-                "En Linux esto normalmente se soluciona dando acceso a tu "
-                "usuario a los dispositivos de entrada (grupo 'input' + regla "
-                "udev), sin necesidad de ejecutar como root. Revisa el README."
-            )
+            err_msg += "\n\n" + tr("error_admin_required_linux_hint")
 
         messagebox.showerror(err_title, err_msg)
 

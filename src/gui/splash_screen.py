@@ -12,9 +12,9 @@ class SplashScreen:
     Splash screen minimalista que respeta el tema de la aplicación.
     """
     
-    def __init__(self, parent_root, tr_dict=None, title="KeyForge", version="1.0"):
+    def __init__(self, parent_root, tr_manager=None, title="KeyForge", version="1.0"):
         self.root = parent_root
-        self.tr = tr_dict if tr_dict else {}
+        self.tr = tr_manager
         self.title_text = title
         self.version_text = f"v{version}"
         
@@ -131,7 +131,7 @@ class SplashScreen:
         )
         
         # --- INFORMACIÓN DE ESTADO ---
-        initial_text = self.tr.get("splash_init", "Initializing...")
+        initial_text = self.tr.tr("splash_init") if self.tr else "Initializing..."
         self.status_text_id = self.canvas.create_text(
             50, bar_y + 20,
             text=initial_text,
