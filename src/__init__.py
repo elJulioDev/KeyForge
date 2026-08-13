@@ -1,5 +1,5 @@
 """
-KeyForge - Herramienta de remapeo de teclas
+KeyForge - Key remapping tool
 """
 from src.config.constants import CURRENT_VERSION, GITHUB_REPO_OWNER
 

@@ -1,6 +1,6 @@
 """
-KeyForge - Herramienta de remapeo de teclas
-Punto de entrada principal de la aplicación
+KeyForge - Key remapping tool
+Main application entry point
 """
 from src.gui import KeyForgeApp
 

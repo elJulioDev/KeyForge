@@ -1,5 +1,5 @@
 """
-Gestor de traducciones con soporte para hot-reload
+Translation manager with hot-reload support
 """
 import json
 from pathlib import Path
@@ -7,9 +7,9 @@ from pathlib import Path
 
 class TranslationManager:
     """
-    Gestiona traducciones con soporte para hot-reload.
+    Manages translations with hot-reload support.
     
-    Estructura esperada de lang.json:
+    Expected lang.json structure:
     {
         "meta": {
             "es": {"name": "Español", "native": "Español"},
@@ -25,106 +25,106 @@ class TranslationManager:
     def __init__(self, lang_file_path):
         """
         Args:
-            lang_file_path: Path al archivo lang.json
+            lang_file_path: Path to the lang.json file
         """
         self.lang_file = Path(lang_file_path)
         self._translations = {}  # {lang_code: {key: value}}
         self._meta = {}          # {lang_code: {name, native}}
         self.current_lang = "en"
-        self._subscribers = []   # Componentes suscritos a cambios
-        self._is_updating = False  # Guard contra re-entrancy
+        self._subscribers = []   # Components subscribed to changes
+        self._is_updating = False  # Guard against re-entrancy
         
     def load(self):
-        """Carga lang.json con estructura mejorada"""
+        """Loads lang.json with improved structure"""
         try:
             if not self.lang_file.exists():
-                print(f"Archivo de traducciones no encontrado: {self.lang_file}")
+                print(f"Translations file not found: {self.lang_file}")
                 return False
                 
             with open(self.lang_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Soporte para estructura nueva (meta + translations)
+            # Support for new structure (meta + translations)
             if "translations" in data:
                 self._translations = data["translations"]
                 self._meta = data.get("meta", {})
             else:
-                # Fallback: estructura vieja (solo traducciones)
+                # Fallback: old structure (translations only)
                 self._translations = data
                 self._meta = {}
             
-            print(f"Traducciones cargadas: {list(self._translations.keys())}")
+            print(f"Translations loaded: {list(self._translations.keys())}")
             return True
             
         except Exception as e:
-            print(f"Error al cargar traducciones: {e}")
+            print(f"Error loading translations: {e}")
             self._translations = {"es": {}, "en": {}}
             return False
     
     def tr(self, key, **kwargs):
         """
-        Traduce una clave con fallback chain: actual → inglés → key
+        Translates a key with fallback chain: current → english → key
         
         Args:
-            key: Clave de traducción
-            **kwargs: Parámetros para format() (ej: app="MiApp")
+            key: Translation key
+            **kwargs: Parameters for format() (e.g.: app="MyApp")
             
         Returns:
-            str: Texto traducido o key si no existe
+            str: Translated text or key if it does not exist
         """
-        # 1. Buscar en idioma actual
+        # 1. Search in the current language
         text = self._translations.get(self.current_lang, {}).get(key)
         
-        # 2. Fallback a inglés
+        # 2. Fallback to English
         if text is None:
             text = self._translations.get("en", {}).get(key)
         
-        # 3. Fallback a la key misma
+        # 3. Fallback to the key itself
         if text is None:
             text = key
         
-        # 4. Aplicar format si hay kwargs
+        # 4. Apply format if there are kwargs
         if kwargs:
             try:
                 text = text.format(**kwargs)
             except (KeyError, ValueError):
-                pass  # Si falta algún parámetro, retornar sin formato
+                pass  # If a parameter is missing, return without formatting
         
         return text
     
     def __call__(self, key, **kwargs):
-        """Permite llamar directamente: tr("key", app="X")"""
+        """Allows direct call: tr("key", app="X")"""
         return self.tr(key, **kwargs)
     
     def get_available_languages(self):
         """
-        Retorna diccionario de idiomas disponibles desde meta.
+        Returns a dictionary of available languages from meta.
         
         Returns:
-            dict: {code: {name, native}} o dict vacío si no hay meta
+            dict: {code: {name, native}} or empty dict if there is no meta
         """
         if self._meta:
             return self._meta.copy()
         
-        # Fallback: generar desde traducciones disponibles
+        # Fallback: generate from available translations
         return {lang: {"name": lang.upper(), "native": lang.upper()} 
                 for lang in self._translations.keys()}
     
     def get_language_name(self, lang_code, display_lang=None):
         """
-        Retorna nombre del idioma para UI.
+        Returns the language name for the UI.
         
         Args:
-            lang_code: Código del idioma (ej: "es")
-            display_lang: Idioma en que mostrar el nombre (default: idioma actual)
+            lang_code: Language code (e.g.: "es")
+            display_lang: Language in which to show the name (default: current language)
             
         Returns:
-            str: Nombre del idioma
+            str: Language name
         """
         if display_lang is None:
             display_lang = self.current_lang
         
-        # Buscar en meta
+        # Search in meta
         if lang_code in self._meta:
             lang_info = self._meta[lang_code]
             return lang_info.get(display_lang, lang_info.get("native", lang_code))
@@ -133,44 +133,44 @@ class TranslationManager:
     
     def set_language(self, lang_code):
         """
-        Cambia idioma y notifica a suscriptores.
+        Changes the language and notifies subscribers.
         
         Args:
-            lang_code: Nuevo código de idioma
+            lang_code: New language code
             
         Returns:
-            bool: True si el idioma cambió, False si era el mismo
+            bool: True if the language changed, False if it was the same
         """
         if lang_code == self.current_lang:
             return False
             
         if lang_code not in self._translations:
-            print(f"Idioma no disponible: {lang_code}")
+            print(f"Language not available: {lang_code}")
             return False
         
         old_lang = self.current_lang
         self.current_lang = lang_code
         
-        print(f"Idioma cambiado: {old_lang} → {lang_code}")
+        print(f"Language changed: {old_lang} → {lang_code}")
         self._notify_subscribers()
         return True
     
     def subscribe(self, component):
         """
-        Registra componente para notificaciones de cambio de idioma.
+        Registers a component for language change notifications.
         
         Args:
-            component: Instancia con método update_translations()
+            component: Instance with an update_translations() method
         """
         if component not in self._subscribers:
             self._subscribers.append(component)
     
     def unsubscribe(self, component):
         """
-        Elimina componente de suscriptores.
+        Removes a component from the subscribers.
         
         Args:
-            component: Instancia a eliminar
+            component: Instance to remove
         """
         try:
             self._subscribers.remove(component)
@@ -178,16 +178,16 @@ class TranslationManager:
             pass
     
     def _notify_subscribers(self):
-        """Llama update_translations() en todos los suscriptores"""
+        """Calls update_translations() on all subscribers"""
         if self._is_updating:
-            return  # Prevenir re-entrancy
+            return  # Prevent re-entrancy
         
         self._is_updating = True
         try:
-            for component in self._subscribers[:]:  # Copia para evitar modificación
+            for component in self._subscribers[:]:  # Copy to avoid modification
                 try:
                     component.update_translations()
                 except Exception as e:
-                    print(f"Error actualizando componente: {e}")
+                    print(f"Error updating component: {e}")
         finally:
             self._is_updating = False

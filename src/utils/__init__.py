@@ -1,5 +1,5 @@
 """
-Utilidades generales
+General utilities
 """
 from .window_manager import WindowManager
 from .logger import get_logger, KeyForgeLogger, log_exception

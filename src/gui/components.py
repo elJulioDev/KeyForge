@@ -1,5 +1,5 @@
 """
-Componentes individuales de la interfaz gráfica
+Individual components of the graphical interface
 """
 import ttkbootstrap as ttk
 from tkinter import StringVar, BooleanVar, messagebox
@@ -8,22 +8,23 @@ from ..utils.icons import get_icon
 
 
 class StatusComponent:
-    """Componente que muestra el estado del script y la aplicación"""
+    """Component that shows the script and application status"""
     
     def __init__(self, parent, tr_manager):
+        """Build the status labels."""
         self.tr_manager = tr_manager
         self.tr = tr_manager
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x", padx=20, pady=(0, 10))
         
-        # Estado actual para re-aplicar en hot-reload
+        # Current state to re-apply on hot-reload
         self._is_active = False
         self._rule_count = 0
         self._is_global = True
         self._is_detected = False
         self._app_name = ""
         
-        # Label de estado principal
+        # Main status label
         self.status_label = ttk.Label(
             self.frame,
             text=self.tr("status_stopped"),
@@ -32,7 +33,7 @@ class StatusComponent:
         )
         self.status_label.pack()
         
-        # Label de estado de aplicación
+        # App status label
         self.app_status_label = ttk.Label(
             self.frame,
             text=self.tr("waiting_config"),
@@ -42,7 +43,7 @@ class StatusComponent:
         self.app_status_label.pack(pady=(3, 0))
     
     def update_script_status(self, is_active, rule_count=0):
-        """Actualiza el estado del script"""
+        """Updates the script status"""
         self._is_active = is_active
         self._rule_count = rule_count
         
@@ -56,7 +57,7 @@ class StatusComponent:
             )
     
     def update_app_status(self, is_global, is_detected, app_name=""):
-        """Actualiza el estado de detección de la aplicación"""
+        """Updates the application detection status"""
         self._is_global = is_global
         self._is_detected = is_detected
         self._app_name = app_name
@@ -78,15 +79,16 @@ class StatusComponent:
             )
     
     def update_translations(self):
-        """Re-aplica traducciones con estado actual"""
+        """Re-applies translations with the current state"""
         self.update_script_status(self._is_active, self._rule_count)
         self.update_app_status(self._is_global, self._is_detected, self._app_name)
 
 
 class AppFocusComponent:
-    """Componente de selección de aplicación específica"""
+    """Component for selecting a specific application"""
     
     def __init__(self, parent, tr_manager, on_refresh_callback, on_toggle_callback, on_selected_callback):
+        """Build the app focus selection UI."""
         self.tr_manager = tr_manager
         self.tr = tr_manager
         self.on_refresh = on_refresh_callback
@@ -95,7 +97,7 @@ class AppFocusComponent:
         
         self.app_focus_var = BooleanVar(value=True)
         
-        # Frame principal con título (LabelFrame)
+        # Main frame with title (LabelFrame)
         self.frame = ttk.Labelframe(
             parent,
             text=self.tr("target_app_title"),
@@ -103,7 +105,7 @@ class AppFocusComponent:
         )
         self.frame.pack(padx=20, pady=(0, 10), fill="x")
         
-        # Checkbox de enfoque
+        # Focus checkbox
         self.check_app_focus = ttk.Checkbutton(
             self.frame,
             text=self.tr("focus_checkbox"),
@@ -113,10 +115,10 @@ class AppFocusComponent:
         )
         self.check_app_focus.pack(anchor="w", pady=(0, 8))
         
-        # Selector de aplicación
+        # App selector
         self._create_app_selector()
         
-        # Info reducida
+        # Reduced info
         self.info_label = ttk.Label(
             self.frame,
             text=self.tr("focus_info"),
@@ -126,7 +128,7 @@ class AppFocusComponent:
         self.info_label.pack(pady=(6, 0))
     
     def _create_app_selector(self):
-        """Crea el selector de aplicación"""
+        """Creates the application selector"""
         app_select_container = ttk.Frame(self.frame)
         app_select_container.pack(fill="x")
         
@@ -158,7 +160,7 @@ class AppFocusComponent:
         app_select_container.columnconfigure(1, weight=1)
     
     def set_controls_state(self, enabled):
-        """Habilita o deshabilita los controles"""
+        """Enables or disables the controls"""
         self.check_app_focus.config(state="normal" if enabled else "disabled")
         
         if enabled and self.app_focus_var.get():
@@ -169,42 +171,43 @@ class AppFocusComponent:
             self.btn_refresh.config(state="disabled")
     
     def get_app_name(self):
-        """Retorna el nombre de la aplicación seleccionada"""
+        """Returns the name of the selected application"""
         return self.app_combo.get() if self.app_focus_var.get() else ""
     
     def set_app_name(self, app_name):
-        """Establece el nombre de la aplicación"""
+        """Sets the name of the application"""
         try:
             self.app_combo.set(app_name)
         except:
             pass
     
     def update_app_list(self, apps):
-        """Actualiza la lista de aplicaciones"""
+        """Updates the list of applications"""
         self.app_combo['values'] = apps
         if apps and not self.app_combo.get():
             self.app_combo.set(apps[0])
     
     def is_focus_enabled(self):
-        """Retorna si el enfoque está habilitado"""
+        """Returns whether focus is enabled"""
         return self.app_focus_var.get()
     
     def update_translations(self):
-        """Actualiza textos estáticos"""
+        """Updates static texts"""
         self.frame.config(text=self.tr("target_app_title"))
         self.check_app_focus.config(text=self.tr("focus_checkbox"))
         self.info_label.config(text=self.tr("focus_info"))
 
 
 class ControlButtonsComponent:
-    """Componente de botones de control principal"""
+    """Component with the main control buttons"""
     
     def __init__(self, parent, tr_manager, on_toggle_callback, on_save_callback, 
                  on_minimize_callback, on_exit_callback):
+        """Build the control buttons."""
         self.tr_manager = tr_manager
         self.tr = tr_manager
         
-        # Estado del script para re-aplicar en hot-reload
+        # Script state to re-apply on hot-reload
         self._is_active = False
         
         self.frame = ttk.Frame(parent)
@@ -216,7 +219,7 @@ class ControlButtonsComponent:
         icon_minimize = get_icon("minus", 18, "#FFFFFF")
         icon_exit = get_icon("x", 18, "#FFFFFF")
 
-        # Botón principal de activar/desactivar (Grande)
+        # Main activate/deactivate button (Large)
         self.toggle_btn = ttk.Button(
             self.frame,
             text=self.tr("activate_script_btn"),
@@ -227,11 +230,11 @@ class ControlButtonsComponent:
         )
         self.toggle_btn.pack(fill="x", pady=(0, 8), ipady=8)
         
-        # Contenedor para los botones inferiores
+        # Container for the secondary buttons
         secondary_btns = ttk.Frame(self.frame)
         secondary_btns.pack(fill="x")
         
-        # Botón Guardar (Izquierda)
+        # Save Button (Left)
         self.btn_save = ttk.Button(
             secondary_btns,
             text=self.tr("save_btn"),
@@ -242,7 +245,7 @@ class ControlButtonsComponent:
         self.btn_save.image = icon_save
         self.btn_save.pack(side="left", fill="x", expand=True, padx=(0, 4))
         
-        # Botón Minimizar (Centro)
+        # Minimize Button (Center)
         self.btn_minimize = ttk.Button(
             secondary_btns,
             text=self.tr("minimize_btn"),
@@ -253,7 +256,7 @@ class ControlButtonsComponent:
         self.btn_minimize.image = icon_minimize
         self.btn_minimize.pack(side="left", fill="x", expand=True, padx=(4, 4))
         
-        # Botón Salir (Derecha)
+        # Exit Button (Right)
         self.btn_exit = ttk.Button(
             secondary_btns,
             text=self.tr("exit_btn"),
@@ -265,7 +268,7 @@ class ControlButtonsComponent:
         self.btn_exit.pack(side="left", fill="x", expand=True, padx=(4, 0))
     
     def set_toggle_state(self, is_active):
-        """Actualiza el estado del botón de activación"""
+        """Updates the state of the activation button"""
         self._is_active = is_active
         
         if is_active:
@@ -282,19 +285,20 @@ class ControlButtonsComponent:
             )
     
     def update_translations(self):
-        """Actualiza textos de botones"""
-        # Re-aplicar toggle con estado actual
+        """Updates the button texts"""
+        # Re-apply toggle with the current state
         self.set_toggle_state(self._is_active)
-        # Botones estáticos
+        # Static buttons
         self.btn_save.config(text=self.tr("save_btn"))
         self.btn_minimize.config(text=self.tr("minimize_btn"))
         self.btn_exit.config(text=self.tr("exit_btn"))
 
 
 class CommonKeysWindow:
-    """Ventana que muestra las teclas comunes"""
+    """Window that shows the common keys"""
     
     def __init__(self, parent, tr_manager):
+        """Build the common keys reference window."""
         self.tr_manager = tr_manager
         self.tr = tr_manager
         self.window_manager = WindowManager()
@@ -312,6 +316,7 @@ class CommonKeysWindow:
         self.window_manager.safe_grab_set(self.window)
 
     def _create_content(self):
+        """Creates the window content."""
         main_container = ttk.Frame(self.window, padding=15)
         main_container.pack(fill="both", expand=True)
         
@@ -334,7 +339,7 @@ class CommonKeysWindow:
         ttk.Button(main_container, text=self.tr("close_btn"), command=self.window.destroy, bootstyle="secondary").pack(pady=(10, 0), fill="x")
     
     def _get_common_keys_text(self):
-        """Retorna el texto con las teclas comunes"""
+        """Returns the text with the common keys"""
         return f"""{self.tr("keys_letters")}: a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
 
 {self.tr("keys_numbers")}: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9

@@ -1,5 +1,5 @@
 """
-Ventana minimizada flotante
+Floating minimized window
 """
 import ttkbootstrap as ttk
 from ..utils.window_manager import WindowManager
@@ -7,43 +7,44 @@ from ..utils.icons import get_icon
 
 
 class MinimizedWindow:
-    """Ventana flotante minimalista para estado minimizado"""
+    """Minimalist floating window for the minimized state"""
     
     def __init__(self, parent, on_restore_callback, on_toggle_callback):
+        """Initialize the minimized window."""
         self.parent = parent
         self.on_restore = on_restore_callback
-        self.on_toggle = on_toggle_callback  # Guardamos la función toggle
+        self.on_toggle = on_toggle_callback  # We store the toggle function
         self.window = None
         self.window_manager = WindowManager()
-        self.canvas = None # Referencia al canvas para redibujar
-        self.size = 90     # Tamaño guardado
+        self.canvas = None # Canvas reference to redraw
+        self.size = 90     # Stored size
     
     def show(self, is_active=False, center_pos=None):
-        """Muestra la ventana minimizada con el estado visual correspondiente"""
+        """Shows the minimized window with the corresponding visual state"""
         if self.window:
             return
         
-        # OBTENER COLORES DEL TEMA ACTUAL
+        # GET CURRENT THEME COLORS
         style = ttk.Style()
         theme_bg = style.colors.bg
         
-        # Crear ventana flotante
+        # Create floating window
         self.window = ttk.Toplevel(self.parent)
         self.window.overrideredirect(True)
         self.window.attributes('-topmost', True)
-        self.window.attributes('-alpha', 0.0) # Inicia invisible para fade-in
+        self.window.attributes('-alpha', 0.0) # Starts invisible for fade-in
         
-        # Tamaño
+        # Size
         size = 90
         
-        # CÁLCULO DE POSICIÓN
+        # POSITION CALCULATION
         if center_pos:
-            # Si nos dan el centro de la ventana principal, nos centramos ahí
+            # If we are given the center of the main window, we center there
             cx, cy = center_pos
             x_pos = int(cx - (size / 2))
             y_pos = int(cy - (size / 2))
         else:
-            # Fallback: Centrado en pantalla (comportamiento anterior)
+            # Fallback: Centered on screen (previous behavior)
             screen_w = self.parent.winfo_screenwidth()
             screen_h = self.parent.winfo_screenheight()
             x_pos = int((screen_w / 2) - (size / 2))
@@ -51,7 +52,7 @@ class MinimizedWindow:
         
         self.window.geometry(f"{size}x{size}+{x_pos}+{y_pos}")
         
-        # APLICAR FONDO DEL TEMA
+        # APPLY THEME BACKGROUND
         self.window.configure(background=theme_bg)
         
         self.canvas = ttk.Canvas(
@@ -63,26 +64,26 @@ class MinimizedWindow:
         )
         self.canvas.pack(fill="both", expand=True)
         
-        # PASAMOS EL ESTADO AL DIBUJADO
+        # WE PASS THE STATE TO THE DRAWING
         self._draw_pro_icon(self.canvas, size, is_active)
         
-        # Eventos
+        # Events
         self._bind_events(self.canvas)
         
-        # Animación de entrada
+        # Entrance animation
         self._fade_in()
     
     def update_visuals(self, is_active):
-        """Redibuja el icono según el nuevo estado (Activo/Inactivo)"""
+        """Redraws the icon according to the new state (Active/Inactive)"""
         if self.canvas:
-            self.canvas.delete("all") # Limpia el dibujo anterior
+            self.canvas.delete("all") # Clears the previous drawing
             self._draw_pro_icon(self.canvas, self.size, is_active)
 
     def _draw_pro_icon(self, canvas, s, is_active):
         """
-        Dibuja un icono moderno usando los colores del tema.
+        Draws a modern icon using the theme colors.
         """
-        # 3. OBTENER PALETA DE COLORES DEL TEMA
+        # 3. GET THE THEME COLOR PALETTE
         style = ttk.Style()
         colors = style.colors
         
@@ -91,46 +92,46 @@ class MinimizedWindow:
         
         bg_color = colors.bg
         
-        # LÓGICA DE COLORES DINÁMICOS
+        # DYNAMIC COLOR LOGIC
         if is_active:
-            # ESTADO ACTIVO: Colores brillantes
-            accent_color = colors.success  # Borde verde (o color de éxito del tema)
-            icon_color = colors.fg         # Icono color principal (texto)
-            dot_color = colors.success     # LED encendido
-            key_fill = colors.secondary    # Cuerpo de la tecla
-            key_border = colors.border     # Borde estándar
+            # ACTIVE STATE: Bright colors
+            accent_color = colors.success  # Green border (or theme success color)
+            icon_color = colors.fg         # Icon main color (text)
+            dot_color = colors.success     # LED on
+            key_fill = colors.secondary    # Key body
+            key_border = colors.border     # Standard border
         else:
-            # ESTADO INACTIVO: Colores apagados
+            # INACTIVE STATE: Dimmed colors
             accent_color = colors.secondary
-            icon_color = colors.secondary  # Icono grisáceo (secondary)
-            dot_color = colors.dark        # LED apagado
-            key_fill = colors.inputbg      # Fondo tipo "input" (caja de texto vacía)
-            key_border = colors.border     # Borde estándar
+            icon_color = colors.secondary  # Grayish icon (secondary)
+            dot_color = colors.dark        # LED off
+            key_fill = colors.inputbg      # "Input" type background (empty text box)
+            key_border = colors.border     # Standard border
             
-        # Borde exterior (Glow/Marco)
+        # Outer border (Glow/Frame)
         self._round_rect(canvas, pad, pad, s-pad, s-pad, r, outline=accent_color, width=2, fill=bg_color)
         
-        # Representación de una Tecla
+        # Representation of a Key
         k_pad = 22
         
-        # Sombra tecla (usamos colors.dark para la profundidad)
+        # Key shadow (we use colors.dark for depth)
         self._round_rect(canvas, k_pad, k_pad-2, s-k_pad, s-k_pad-2, 8, fill=colors.dark, outline="") 
         
-        # Cara tecla (Usa color dinámico)
+        # Key face (Uses dynamic color)
         self._round_rect(canvas, k_pad, k_pad, s-k_pad, s-k_pad, 8, fill=key_fill, outline=key_border, width=1) 
         
-        # Icono (Usa color dinámico)
+        # Icon (Uses dynamic color)
         wrench_icon = get_icon("wrench", 36, icon_color)
         canvas.create_image(s/2, s/2, image=wrench_icon)
         
-        # Indicador de estado (LED)
+        # State indicator (LED)
         ind_r = 3
         ind_x = s - 15
         ind_y = 15
         canvas.create_oval(ind_x-ind_r, ind_y-ind_r, ind_x+ind_r, ind_y+ind_r, fill=dot_color, outline="")
 
     def _round_rect(self, canvas, x1, y1, x2, y2, radius=25, **kwargs):
-        """Función auxiliar para dibujar rectángulos redondeados"""
+        """Helper function to draw rounded rectangles"""
         points = [x1+radius, y1,
                   x1+radius, y1,
                   x2-radius, y1,
@@ -154,7 +155,7 @@ class MinimizedWindow:
         return canvas.create_polygon(points, **kwargs, smooth=True)
 
     def _bind_events(self, widget):
-        """Configura eventos de arrastre y click"""
+        """Configures drag and click events"""
         widget.bind("<Double-Button-1>", lambda e: self._restore())
         widget.bind("<ButtonPress-1>", lambda e: self.window_manager.start_drag(e, self.window))
         widget.bind("<B1-Motion>", lambda e: self.window_manager.drag(e, self.window))
@@ -177,9 +178,9 @@ class MinimizedWindow:
             self._restore()
 
     def _restore(self):
-        """Restaura la ventana principal pasando la posición actual"""
+        """Restores the main window passing the current position"""
         if self.window:
-            # 1. Obtener el centro actual de la ventana minimizada
+            # 1. Get the current center of the minimized window
             mx = self.window.winfo_x()
             my = self.window.winfo_y()
             mw = self.window.winfo_width()
@@ -188,25 +189,28 @@ class MinimizedWindow:
             center_x = mx + (mw / 2)
             center_y = my + (mh / 2)
             
-            # Ocultamos el icono
+            # We hide the icon
             self.hide()
             
-            # 2. Llamamos al callback pasando la posición (center_pos)
-            # Nota: self.on_restore es _restore_window en la app principal
+            # 2. We call the callback passing the position (center_pos)
+            # Note: self.on_restore is _restore_window in the main app
             self.on_restore(center_pos=(center_x, center_y))
         else:
             self.on_restore()
 
     def _fade_in(self, alpha=0.0):
+        """Fades the window in by gradually increasing the alpha."""
         if self.window and alpha < 0.9:
             self.window.attributes('-alpha', alpha)
             self.parent.after(15, lambda: self._fade_in(alpha + 0.05))
     
     def hide(self):
+        """Destroys the minimized window."""
         if self.window:
             self.window.destroy()
             self.window = None
             self.canvas = None
     
     def is_visible(self):
+        """Returns whether the minimized window is currently visible."""
         return self.window is not None

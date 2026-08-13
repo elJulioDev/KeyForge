@@ -1,12 +1,12 @@
 """
-Monitor de ventanas basado en eventos (Windows-only)
-Alternativa eficiente al polling
+Event-based window monitor (Windows-only)
+Efficient alternative to polling
 """
 
 import sys
 import threading
 
-# Importar solo en Windows
+# Import only on Windows
 if sys.platform == 'win32':
     try:
         import ctypes
@@ -14,11 +14,11 @@ if sys.platform == 'win32':
         user32 = ctypes.windll.user32
         ole32 = ctypes.windll.ole32
         
-        # Constantes de WinEvent
+        # WinEvent constants
         WINEVENT_OUTOFCONTEXT = 0x0000
         EVENT_SYSTEM_FOREGROUND = 0x0003
         
-        # Definir tipo de callback
+        # Define callback type
         WinEventProcType = ctypes.WINFUNCTYPE(
             None,
             wintypes.HANDLE,
@@ -39,27 +39,27 @@ else:
 
 class WindowEventMonitor:
     """
-    Monitor de cambios de ventana usando WinEventHook (solo Windows).
-    Más eficiente que polling porque solo reacciona cuando cambia el foco.
+    Window change monitor using WinEventHook (Windows only).
+    More efficient than polling because it only reacts when focus changes.
     """
     
     def __init__(self, callback=None):
         """
         Args:
-            callback: Función que se llama cuando cambia la ventana activa
-                      Recibe (window_title: str) como parámetro
+            callback: Function called when the active window changes
+                      Receives (window_title: str) as a parameter
         """
         self.callback = callback
         self.hook_handle = None
         self.running = False
         self.thread = None
-        self._callback_ref = None  # Mantener referencia para evitar GC
+        self._callback_ref = None  # Keep a reference to avoid GC
         
         if not WINDOWS_EVENTS_AVAILABLE:
-            raise RuntimeError("WinEventHook no disponible en este sistema")
+            raise RuntimeError("WinEventHook not available on this system")
     
     def start(self):
-        """Inicia el monitor de eventos"""
+        """Start the event monitor"""
         if self.running:
             return False
         
@@ -69,7 +69,7 @@ class WindowEventMonitor:
         return True
     
     def stop(self):
-        """Detiene el monitor de eventos"""
+        """Stop the event monitor"""
         if not self.running:
             return False
         
@@ -84,21 +84,21 @@ class WindowEventMonitor:
         return True
     
     def _event_loop(self):
-        """Loop principal de eventos (ejecutado en thread separado)"""
-        # Definir el callback que se llamará en cada evento
+        """Main event loop (runs in a separate thread)"""
+        # Define the callback that will be called on each event
         def win_event_callback(hWinEventHook, event, hwnd, idObject, idChild, 
                               dwEventThread, dwmsEventTime):
-            # Solo procesar cambios de ventana en primer plano
+            # Only process foreground window changes
             if event == EVENT_SYSTEM_FOREGROUND:
                 window_title = self._get_window_title(hwnd)
                 if window_title and self.callback:
-                    # Llamar al callback en el thread principal (thread-safe)
+                    # Call the callback in the main thread (thread-safe)
                     self.callback(window_title)
         
-        # Mantener referencia para evitar garbage collection
+        # Keep a reference to avoid garbage collection
         self._callback_ref = WinEventProcType(win_event_callback)
         
-        # Registrar el hook
+        # Register the hook
         self.hook_handle = user32.SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,  # eventMin
             EVENT_SYSTEM_FOREGROUND,  # eventMax
@@ -110,11 +110,11 @@ class WindowEventMonitor:
         )
         
         if not self.hook_handle:
-            print("Error: No se pudo registrar WinEventHook")
+            print("Error: Could not register WinEventHook")
             self.running = False
             return
         
-        # Loop de mensajes de Windows
+        # Windows message loop
         msg = wintypes.MSG()
         while self.running:
             result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
@@ -125,7 +125,7 @@ class WindowEventMonitor:
     
     @staticmethod
     def _get_window_title(hwnd):
-        """Obtiene el título de una ventana por handle"""
+        """Get a window's title by handle"""
         try:
             length = user32.GetWindowTextLengthW(hwnd)
             if length == 0:
@@ -138,7 +138,7 @@ class WindowEventMonitor:
             return ""
 
 
-# Función de utilidad para verificar disponibilidad
+# Utility function to check availability
 def is_event_monitoring_available():
-    """Verifica si el monitoreo por eventos está disponible"""
+    """Check if event monitoring is available"""
     return WINDOWS_EVENTS_AVAILABLE

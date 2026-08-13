@@ -1,10 +1,10 @@
 """
-Gestor de íconos reales (PNG) para reemplazar los emojis de la interfaz.
+Manager for real (PNG) icons, replacing the emojis of the UI.
 
-Los archivos en assets/icons/ son máscaras: forma opaca sobre fondo
-transparente (sin color propio). Este módulo las tiñe al color pedido
-y cachea el resultado, porque Tkinter necesita mantener una referencia
-viva al PhotoImage o el recolector de basura lo destruye.
+The files in assets/icons/ are masks: an opaque shape on a transparent
+background (with no color of their own). This module tints them to the
+requested color and caches the result, because Tkinter needs to keep a
+live reference to the PhotoImage or the garbage collector destroys it.
 """
 from pathlib import Path
 from PIL import Image, ImageTk
@@ -15,12 +15,12 @@ _cache = {}
 
 def get_icon(name: str, size: int = 16, color: str = "#FFFFFF") -> ImageTk.PhotoImage:
     """
-    Carga assets/icons/<name>.png, lo escala a size x size y lo tiñe de
-    'color', preservando el canal alpha original (el contorno del ícono).
+    Load assets/icons/<name>.png, scale it to size x size and tint it with
+    'color', preserving the original alpha channel (the icon outline).
 
-    Cachea por (name, size, color): llamar varias veces con los mismos
-    parámetros no vuelve a decodificar el archivo ni crea referencias
-    nuevas para el garbage collector.
+    Cached by (name, size, color): calling it repeatedly with the same
+    parameters does not re-decode the file nor create new references for
+    the garbage collector.
     """
     key = (name, size, color)
     cached = _cache.get(key)
@@ -29,7 +29,7 @@ def get_icon(name: str, size: int = 16, color: str = "#FFFFFF") -> ImageTk.Photo
 
     path = _ICONS_DIR / f"{name}.png"
     if not path.exists():
-        raise FileNotFoundError(f"Ícono no encontrado: {path}")
+        raise FileNotFoundError(f"Icon not found: {path}")
 
     source = Image.open(path).convert("RGBA")
     if source.size != (size, size):

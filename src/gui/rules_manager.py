@@ -1,5 +1,5 @@
 """
-Componente para gestionar múltiples reglas de remapeo
+Component for managing multiple remapping rules
 """
 import ttkbootstrap as ttk
 from tkinter import messagebox
@@ -8,25 +8,26 @@ from ..utils import WindowManager, get_icon
 
 
 class RulesManagerComponent:
-    """Gestor visual de reglas de remapeo con tabla Treeview"""
+    """Visual manager for remapping rules with a Treeview table"""
     
     def __init__(self, parent, tr_manager, on_detect_key_callback):
+        """Initialize the rules manager component."""
         self.parent = parent
         self.tr_manager = tr_manager
         self.tr = tr_manager
         self.on_detect_key = on_detect_key_callback
         self.selected_index = None
-        self.current_rules = [] # Almacén local de reglas para edición
+        self.current_rules = [] # Local store of rules for editing
         
         self._create_ui()
     
     def _create_ui(self):
-        """Crea la interfaz del gestor de reglas"""
-        # Usamos un Frame normal en lugar de Labelframe para que se integre mejor en la pestaña
+        """Creates the rules manager interface"""
+        # We use a normal Frame instead of a Labelframe so it integrates better into the tab
         self.frame = ttk.Frame(self.parent, padding=10)
         self.frame.pack(fill="both", expand=True)
         
-        # --- BARRA DE HERRAMIENTAS (Arriba) ---
+        # --- TOOLBAR (Top) ---
         toolbar = ttk.Frame(self.frame)
         toolbar.pack(fill="x", pady=(0, 10))
         
@@ -36,7 +37,7 @@ class RulesManagerComponent:
             font=("-size", 12, "-weight", "bold")
         ).pack(side="left")
 
-        # Botones alineados a la derecha
+        # Buttons aligned to the right
         btn_frame = ttk.Frame(toolbar)
         btn_frame.pack(side="right")
 
@@ -74,7 +75,7 @@ class RulesManagerComponent:
         self.btn_add.image = icon_add
         self.btn_add.pack(side="right", padx=5)
         
-        # --- TABLA ---
+        # --- TABLE ---
         tree_frame = ttk.Frame(self.frame)
         tree_frame.pack(fill="both", expand=True)
         
@@ -112,10 +113,10 @@ class RulesManagerComponent:
         
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         
-        # Doble clic para editar
+        # Double click to edit
         self.tree.bind("<Double-1>", lambda e: self._edit_rule_dialog())
         
-        # Footer con tip
+        # Footer with tip
         self.tip_label = ttk.Label(
             self.frame,
             text=self.tr("rules_tip"),
@@ -125,6 +126,7 @@ class RulesManagerComponent:
         self.tip_label.pack(pady=(5, 0), anchor="w")
     
     def _on_select(self, event):
+        """Stores the selected row index."""
         selection = self.tree.selection()
         if selection:
             self.selected_index = self.tree.index(selection[0])
@@ -132,10 +134,10 @@ class RulesManagerComponent:
             self.selected_index = None
     
     def load_rules(self, rules):
-        """Carga reglas en la tabla y guarda referencia"""
-        self.current_rules = rules # Guardamos los objetos KeyRule
+        """Loads rules into the table and stores a reference"""
+        self.current_rules = rules # We store the KeyRule objects
         
-        # Limpiar y recargar
+        # Clear and reload
         for item in self.tree.get_children():
             self.tree.delete(item)
         
@@ -151,38 +153,42 @@ class RulesManagerComponent:
             ), tags=(status_tag,))
     
     def _add_rule_dialog(self):
+        """Opens the dialog to add a new rule."""
         RuleDialog(self.parent, self.tr_manager, self.on_detect_key, callback=self._on_rule_added)
     
     def _edit_rule_dialog(self):
+        """Opens the dialog to edit the selected rule."""
         if self.selected_index is None:
             messagebox.showwarning(self.tr("warning"), self.tr("select_rule_msg"))
             return
 
-        # RECUPERAR DATOS REALES PARA EDICIÓN
+        # RETRIEVE THE REAL DATA FOR EDITING
         try:
             rule_obj = self.current_rules[self.selected_index]
-            rule_data = rule_obj.to_dict() # Convertir objeto a dict
+            rule_data = rule_obj.to_dict() # Convert object to dict
             
             RuleDialog(
                 self.parent, 
                 self.tr_manager, 
                 self.on_detect_key, 
                 rule_data=rule_data, 
-                callback=self._on_rule_edited # Callback específico para editar
+                callback=self._on_rule_edited # Specific callback for editing
             )
         except IndexError:
             return
 
     def _on_rule_added(self, rule_data):
+        """Forwards the newly added rule to the parent callback."""
         if hasattr(self, 'on_add_rule'):
             self.on_add_rule(rule_data)
 
     def _on_rule_edited(self, rule_data):
-        # Llamamos al callback de edición pasando el índice y los datos nuevos
+        # We call the edit callback passing the index and the new data
         if hasattr(self, 'on_edit_rule'):
             self.on_edit_rule(self.selected_index, rule_data)
 
     def _delete_rule(self):
+        """Deletes the selected rule."""
         if self.selected_index is None:
             return
         
@@ -191,17 +197,18 @@ class RulesManagerComponent:
             self.selected_index = None
 
     def set_controls_state(self, enabled):
+        """Enables or disables the toolbar buttons."""
         state = "normal" if enabled else "disabled"
-        # Deshabilitar todos los botones dentro del toolbar
+        # Disable all buttons inside the toolbar
         for child in self.frame.winfo_children():
-             if isinstance(child, ttk.Frame): # El toolbar
+             if isinstance(child, ttk.Frame): # The toolbar
                  for btn in child.winfo_children():
                      if isinstance(btn, ttk.Button):
                          btn.config(state=state)
 
     def update_translations(self):
-        """Actualiza headings, botones y recarga reglas"""
-        # Headings de la tabla
+        """Updates headings, buttons and reloads rules"""
+        # Table headings
         self.tree.heading("#0", text=self.tr("status_label"))
         self.tree.heading("source", text=self.tr("replace_label").replace(":", ""))
         self.tree.heading("target", text=self.tr("with_label").replace(":", ""))
@@ -210,27 +217,28 @@ class RulesManagerComponent:
         # Footer tip
         self.tip_label.config(text=self.tr("rules_tip"))
         
-        # Botones del toolbar
+        # Toolbar buttons
         self.btn_delete.config(text=self.tr("delete_rule_btn"))
         self.btn_edit.config(text=self.tr("edit_rule_btn"))
         self.btn_add.config(text=self.tr("add_rule_btn"))
         
-        # Recargar reglas con traducciones actualizadas (modo hold/toggle)
+        # Reload rules with updated translations (hold/toggle mode)
         if self.current_rules:
             self.load_rules(self.current_rules)
 
-# --- CLASE RULE DIALOG (IGUAL QUE ANTES PERO COMPROBADO) ---
+# --- RULE DIALOG CLASS (SAME AS BEFORE BUT VERIFIED) ---
 class RuleDialog:
-    """Diálogo para crear/editar una regla"""
+    """Dialog to create/edit a rule"""
     
     def __init__(self, parent, tr_manager, on_detect_key, rule_data=None, callback=None):
+        """Build the rule dialog."""
         self.parent = parent
         self.tr_manager = tr_manager
         self.tr = tr_manager
         self.on_detect_key = on_detect_key
         self.callback = callback
         self.rule_data = rule_data or {}
-        self.window_manager = WindowManager()  # Instancia del manager
+        self.window_manager = WindowManager()  # Manager instance
         
         self.dialog = ttk.Toplevel(parent)
         title = self.tr("edit_rule_title") if rule_data else self.tr("add_rule_title")
@@ -249,6 +257,7 @@ class RuleDialog:
         self.window_manager.safe_grab_set(self.dialog)
     
     def _create_ui(self):
+        """Creates the dialog UI."""
         main_frame = ttk.Frame(self.dialog, padding=20)
         main_frame.pack(fill="both", expand=True)
 
@@ -292,20 +301,24 @@ class RuleDialog:
         ttk.Button(main_frame, text=self.tr("save_btn"), bootstyle="success", command=self._save).pack(side="right")
 
     def _detect_key(self, var):
+        """Captures a pressed key and stores it in the given variable."""
         lbl = ttk.Label(self.dialog, text=self.tr("press_key_label"), bootstyle="inverse-danger")
         lbl.place(relx=0.5, rely=0.9, anchor="center")
         self.on_detect_key(lambda k, e: (var.set(k) if k else None, lbl.destroy()))
 
     def _show_common_keys(self):
+        """Opens the common keys reference window."""
         CommonKeysWindow(self.dialog, self.tr_manager)
 
     def _load_rule_data(self):
+        """Populates the fields with the existing rule data."""
         self.source_var.set(self.rule_data.get("key_to_replace", ""))
         self.target_var.set(self.rule_data.get("replacement_key", ""))
         self.mode_var.set(self.rule_data.get("mode", "hold"))
         self.enabled_var.set(self.rule_data.get("enabled", True))
 
     def _save(self):
+        """Collects the data and calls the callback, then closes the dialog."""
         if not self.source_var.get() or not self.target_var.get():
             return
         data = {

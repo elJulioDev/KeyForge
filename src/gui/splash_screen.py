@@ -1,7 +1,7 @@
 """
 src/gui/splash_screen.py
-Splash Screen Dinámico para KeyForge
-Se adapta automáticamente a temas claros y oscuros y soporta traducción.
+Dynamic Splash Screen for KeyForge
+Automatically adapts to light and dark themes and supports translation.
 """
 import ttkbootstrap as ttk
 from tkinter import Canvas
@@ -9,16 +9,17 @@ from ..utils.icons import get_icon
 
 class SplashScreen:
     """
-    Splash screen minimalista que respeta el tema de la aplicación.
+    Minimalist splash screen that respects the application theme.
     """
     
     def __init__(self, parent_root, tr_manager=None, title="KeyForge", version="1.0"):
+        """Initialize and show the splash screen."""
         self.root = parent_root
         self.tr = tr_manager
         self.title_text = title
         self.version_text = f"v{version}"
         
-        # 1. Obtener el estilo y colores del tema actual
+        # 1. Get the style and colors of the current theme
         self.style = ttk.Style()
         self.colors = self.style.colors
         
@@ -29,20 +30,20 @@ class SplashScreen:
         self._show()
 
     def _is_light_theme(self):
-        """Detecta si el tema actual es claro (Light)"""
+        """Detects if the current theme is light"""
         return self.style.theme.type == 'light'
 
     def _show(self):
-        """Inicializa y muestra la ventana"""
+        """Initializes and shows the window"""
         self.window = ttk.Toplevel(self.root)
-        self.window.overrideredirect(True) # Sin bordes
+        self.window.overrideredirect(True) # No borders
         self.window.attributes('-topmost', True)
         
-        # Dimensiones compactas
+        # Compact dimensions
         width = 360
         height = 160
         
-        # Centrar en pantalla
+        # Center on screen
         screen_w = self.window.winfo_screenwidth()
         screen_h = self.window.winfo_screenheight()
         x = (screen_w // 2) - (width // 2)
@@ -50,11 +51,11 @@ class SplashScreen:
         
         self.window.geometry(f"{width}x{height}+{x}+{y}")
         
-        # 2. Usar el color de fondo del tema (bg) en lugar de negro fijo
+        # 2. Use the theme background color (bg) instead of a fixed black
         bg_color = self.colors.bg 
         self.window.configure(bg=bg_color)
         
-        # Canvas también usa el fondo del tema
+        # Canvas also uses the theme background
         self.canvas = Canvas(
             self.window,
             width=width,
@@ -68,31 +69,31 @@ class SplashScreen:
         self.window.update()
 
     def _draw_ui(self, w, h):
-        """Dibuja los elementos usando colores dinámicos"""
+        """Draws the elements using dynamic colors"""
         
-        # Colores extraídos del tema
+        # Colors extracted from the theme
         fg_color = self.colors.fg            
         secondary_color = self.colors.secondary  
         border_color = self.colors.border    
         accent_color = self.colors.success   
         
-        # Fondo de la barra de progreso
+        # Progress bar background
         if self._is_light_theme():
             bar_bg_color = "#e0e0e0" 
         else:
             bar_bg_color = "#111111" 
 
-        # --- BORDES ---
+        # --- BORDERS ---
         self.canvas.create_rectangle(
             0, 0, w-1, h-1,
             outline=border_color,
             width=1
         )
         
-        # --- TÍTULO (Color adaptativo) ---
+        # --- TITLE (Adaptive color) ---
         title_icon = get_icon("wrench", 26, fg_color)
         self.canvas.create_image(w//2 - 62, 50, image=title_icon, anchor="e")
-        self.canvas.title_icon = title_icon  # referencia viva
+        self.canvas.title_icon = title_icon  # live reference
         self.canvas.create_text(
             w//2 - 50, 50,
             text=self.title_text,
@@ -101,7 +102,7 @@ class SplashScreen:
             anchor="w"
         )
         
-        # --- VERSIÓN ---
+        # --- VERSION ---
         self.canvas.create_text(
             w//2, 90,
             text=self.version_text,
@@ -110,11 +111,11 @@ class SplashScreen:
             anchor="center"
         )
         
-        # --- BARRA DE PROGRESO ---
+        # --- PROGRESS BAR ---
         bar_y = 105
         bar_height = 6
         
-        # Fondo de la barra
+        # Bar background
         self.progress_bg = self.canvas.create_rectangle(
             50, bar_y, w-50, bar_y + bar_height,
             fill=bar_bg_color,
@@ -122,7 +123,7 @@ class SplashScreen:
             width=1
         )
         
-        # Relleno de la barra (Color de énfasis/Success)
+        # Bar fill (Accent/Success color)
         self.progress_bar = self.canvas.create_rectangle(
             50, bar_y, 50, bar_y + bar_height, 
             fill=accent_color,
@@ -130,7 +131,7 @@ class SplashScreen:
             tags="progress"
         )
         
-        # --- INFORMACIÓN DE ESTADO ---
+        # --- STATUS INFORMATION ---
         initial_text = self.tr.tr("splash_init") if self.tr else "Initializing..."
         self.status_text_id = self.canvas.create_text(
             50, bar_y + 20,
@@ -140,7 +141,7 @@ class SplashScreen:
             anchor="w"
         )
         
-        # Derecha: Porcentaje
+        # Right side: Percentage
         self.percent_text = self.canvas.create_text(
             w-50, bar_y + 20,
             text="0%",
@@ -150,12 +151,12 @@ class SplashScreen:
         )
 
     def update_step(self, value, text):
-        """Actualiza la visualización"""
+        """Updates the display"""
         if not self.canvas: return
         
         self.progress_value = max(0, min(100, value))
         
-        # Cálculo de geometría
+        # Geometry calculation
         w = 360
         margin = 50
         max_bar_width = w - (margin * 2)
@@ -170,19 +171,19 @@ class SplashScreen:
             margin + current_width, bar_y + bar_height
         )
         
-        # Usamos el color success del tema para consistencia
+        # We use the theme success color for consistency
         fill_color = self.colors.success
             
         self.canvas.itemconfig(self.progress_bar, fill=fill_color)
         
-        # Textos
+        # Texts
         self.canvas.itemconfig(self.percent_text, text=f"{int(self.progress_value)}%")
         self.canvas.itemconfig(self.status_text_id, text=text)
         
         self.window.update_idletasks()
 
     def close(self):
-        """Cierra el splash"""
+        """Closes the splash"""
         if self.window:
             self.window.destroy()
             self.window = None

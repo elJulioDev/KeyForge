@@ -1,12 +1,12 @@
 """
-Utilidades para manejo de ventanas
+Utilities for window management.
 """
 import sys
 
 
 class WindowManager:
-    """Gestiona operaciones de ventanas como arrastre y centrado dinámico"""
-    
+    """Handles window operations such as dragging and dynamic centering."""
+
     def __init__(self):
         self.is_dragging = False
         self.drag_start_x = 0
@@ -15,7 +15,7 @@ class WindowManager:
         self.offset_y = 0
     
     def start_drag(self, event, window):
-        """Inicia el arrastre de una ventana"""
+        """Start dragging a window."""
         self.offset_x = event.x_root - window.winfo_x()
         self.offset_y = event.y_root - window.winfo_y()
         self.drag_start_x = event.x_root
@@ -23,14 +23,14 @@ class WindowManager:
         self.is_dragging = False
     
     def drag(self, event, window):
-        """Arrastra la ventana siguiendo el mouse"""
+        """Drag the window following the mouse."""
         x = event.x_root - self.offset_x
         y = event.y_root - self.offset_y
         window.geometry(f"+{x}+{y}")
         self.is_dragging = True
     
     def end_drag(self, event):
-        """Finaliza el arrastre y detecta si fue un clic o arrastre"""
+        """End the drag and detect whether it was a click or a drag."""
         distance = abs(event.x_root - self.drag_start_x) + abs(event.y_root - self.drag_start_y)
         was_click = distance < 5 and not self.is_dragging
         self.is_dragging = False
@@ -38,37 +38,37 @@ class WindowManager:
 
     def center_and_resize(self, window, parent=None):
         """
-        Calcula el tamaño necesario para el contenido y centra la ventana.
+        Calculate the size needed for the content and center the window.
         """
-        # Ocultar ventana mientras se calcula para evitar parpadeos
+        # Hide the window while calculating to avoid flicker
         window.withdraw()
-        window.update_idletasks()  # Forzar cálculo de dimensiones
+        window.update_idletasks()  # Force dimension calculation
         
-        # Obtener tamaño requerido por los widgets + un poco de padding
+        # Get the size required by the widgets + a bit of padding
         req_w = window.winfo_reqwidth() + 20
         req_h = window.winfo_reqheight() + 20
         
-        # Obtener dimensiones de pantalla
+        # Get screen dimensions
         screen_w = window.winfo_screenwidth()
         screen_h = window.winfo_screenheight()
         
-        # Calcular posición centrada
+        # Calculate centered position
         x = int((screen_w / 2) - (req_w / 2))
         y = int((screen_h / 2) - (req_h / 2))
         
-        # Aplicar geometría
+        # Apply geometry
         window.geometry(f"{req_w}x{req_h}+{x}+{y}")
-        window.deiconify()  # Mostrar ventana
+        window.deiconify()  # Show window
 
     def elevate(self, window, parent=None):
         """
-        Fuerza a 'window' a mostrarse por encima de otras ventanas de la app.
+        Force 'window' to show above the other windows of the app.
 
-        Cada paso va en su propio try/except: en Linux hay mucha variedad de
-        WM/compositores y no todos soportan los mismos hints (por ejemplo
-        '-type dialog' es X11 puro, puede fallar bajo Wayland). Si alguno
-        falla no debe frenar la creación del diálogo ni dejarlo a medio
-        inicializar con un grab_set() colgado.
+        Each step goes in its own try/except: on Linux there is a lot of
+        variety of WM/compositors and not all of them support the same hints
+        (for example '-type dialog' is pure X11, it can fail under Wayland).
+        If any of them fails it must not stop the dialog creation nor leave
+        it half-initialized with a stuck grab_set().
         """
         if parent is not None:
             try:
@@ -101,10 +101,10 @@ class WindowManager:
 
     def safe_grab_set(self, window):
         """
-        grab_set() falla con TclError si la ventana todavía no es 'viewable'
-        (puede pasar justo después de deiconify() en algunos WM). En vez de
-        dejar la excepción sin capturar -lo que deja el diálogo abierto pero
-        sin inputs- reintenta una vez en el próximo ciclo de eventos.
+        grab_set() fails with TclError if the window is not 'viewable' yet
+        (this can happen right after deiconify() on some WMs). Instead of
+        leaving the exception uncaught - which leaves the dialog open but
+        without inputs - retry once on the next event loop cycle.
         """
         try:
             window.grab_set()

@@ -1,6 +1,6 @@
 """
-Sistema de logging profesional para KeyForge
-Logs rotatorios con análisis de errores
+Professional logging system for KeyForge
+Rotating logs with error analysis
 """
 
 import logging
@@ -13,13 +13,13 @@ from typing import Optional
 
 class KeyForgeLogger:
     """
-    Sistema de logging singleton con rotación automática.
-    
-    Características:
-    - Archivos de log con rotación (5MB max)
-    - Mantiene los últimos 3 archivos
-    - Formato profesional con timestamp y nivel
-    - Logs en archivo + consola (solo errores críticos)
+    Singleton logging system with automatic rotation.
+
+    Features:
+    - Rotating log files (5MB max)
+    - Keeps the last 3 files
+    - Professional format with timestamp and level
+    - Logs to file + console (only critical errors)
     """
     
     _instance: Optional['KeyForgeLogger'] = None
@@ -38,21 +38,21 @@ class KeyForgeLogger:
         self._setup_logger()
     
     def _setup_logger(self):
-        """Configura el sistema de logging"""
+        """Configure the logging system."""
         self.logger = logging.getLogger('KeyForge')
         self.logger.setLevel(logging.DEBUG)
         
-        # Evitar duplicación de handlers
+        # Avoid duplicate handlers
         if self.logger.handlers:
             return
         
-        # Formato profesional con colores para consola
+        # Professional format with colors for the console
         log_format = '%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s | %(message)s'
         date_format = '%Y-%m-%d %H:%M:%S'
         
         formatter = logging.Formatter(log_format, datefmt=date_format)
         
-        # --- HANDLER 1: Archivo con rotación ---
+        # --- HANDLER 1: Rotating file ---
         log_dir = self._get_log_directory()
         log_dir.mkdir(parents=True, exist_ok=True)
         
@@ -60,30 +60,30 @@ class KeyForgeLogger:
         
         file_handler = RotatingFileHandler(
             log_file,
-            maxBytes=5 * 1024 * 1024,  # 5MB por archivo
-            backupCount=3,              # Mantener últimos 3 archivos
+            maxBytes=5 * 1024 * 1024,  # 5MB per file
+            backupCount=3,              # Keep the last 3 files
             encoding='utf-8'
         )
         file_handler.setFormatter(formatter)
         file_handler.setLevel(logging.DEBUG)
         
-        # --- HANDLER 2: Consola (solo errores críticos) ---
+        # --- HANDLER 2: Console (only critical errors) ---
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(self._get_colored_formatter())
-        console_handler.setLevel(logging.WARNING)  # Solo warnings y errores
+        console_handler.setLevel(logging.WARNING)  # Only warnings and errors
         
-        # Agregar handlers
+        # Add handlers
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
         
-        # Log de inicio
+        # Startup log
         self.logger.info("=" * 70)
-        self.logger.info("KeyForge - Sistema de logging inicializado")
-        self.logger.info(f"Archivo de log: {log_file}")
+        self.logger.info("KeyForge - Logging system initialized")
+        self.logger.info(f"Log file: {log_file}")
         self.logger.info("=" * 70)
     
     def _get_log_directory(self) -> Path:
-        """Determina la ruta del directorio de logs"""
+        """Determine the path of the log directory."""
         if sys.platform == 'win32':
             # Windows: AppData/Local/KeyForge/logs
             log_dir = Path.home() / 'AppData' / 'Local' / 'KeyForge' / 'logs'
@@ -98,15 +98,15 @@ class KeyForgeLogger:
     
     def _get_colored_formatter(self) -> logging.Formatter:
         """
-        Crea un formatter con colores para la consola.
-        Solo funciona en terminales compatibles.
+        Create a formatter with colors for the console.
+        Only works on compatible terminals.
         """
-        # Códigos ANSI para colores
+        # ANSI codes for colors
         COLORS = {
             'DEBUG': '\033[36m',    # Cyan
-            'INFO': '\033[32m',     # Verde
-            'WARNING': '\033[33m',  # Amarillo
-            'ERROR': '\033[31m',    # Rojo
+            'INFO': '\033[32m',     # Green
+            'WARNING': '\033[33m',  # Yellow
+            'ERROR': '\033[31m',    # Red
             'CRITICAL': '\033[35m', # Magenta
             'RESET': '\033[0m'
         }
@@ -124,15 +124,15 @@ class KeyForgeLogger:
         )
     
     def get_logger(self) -> logging.Logger:
-        """Retorna la instancia del logger"""
+        """Return the logger instance."""
         return self.logger
     
     def cleanup_old_logs(self, days: int = 7):
         """
-        Elimina logs más antiguos que X días.
+        Delete logs older than X days.
         
         Args:
-            days: Cantidad de días a mantener
+            days: Number of days to keep
         """
         log_dir = self._get_log_directory()
         
@@ -148,26 +148,26 @@ class KeyForgeLogger:
                     log_file.unlink()
                     deleted_count += 1
                 except Exception as e:
-                    self.logger.warning(f"No se pudo eliminar {log_file}: {e}")
+                    self.logger.warning(f"Could not delete {log_file}: {e}")
         
         if deleted_count > 0:
-            self.logger.info(f"Limpieza de logs: {deleted_count} archivos eliminados")
+            self.logger.info(f"Log cleanup: {deleted_count} files deleted")
 
 
 class PerformanceLogger:
     """
-    Logger especializado para métricas de rendimiento.
+    Logger specialized for performance metrics.
     
-    Uso:
-        with PerformanceLogger("Operación costosa"):
-            # código a medir
+    Usage:
+        with PerformanceLogger("Expensive operation"):
+            # code to measure
     """
     
     def __init__(self, operation_name: str, threshold_ms: float = 10.0):
         """
         Args:
-            operation_name: Nombre de la operación
-            threshold_ms: Solo logear si excede este tiempo (ms)
+            operation_name: Name of the operation
+            threshold_ms: Only log if it exceeds this time (ms)
         """
         self.operation_name = operation_name
         self.threshold_ms = threshold_ms
@@ -185,7 +185,7 @@ class PerformanceLogger:
         
         if elapsed_ms > self.threshold_ms:
             self.logger.warning(
-                f"Operación lenta: {self.operation_name} tomó {elapsed_ms:.2f}ms"
+                f"Slow operation: {self.operation_name} took {elapsed_ms:.2f}ms"
             )
         else:
             self.logger.debug(
@@ -193,35 +193,35 @@ class PerformanceLogger:
             )
 
 
-# Funciones de conveniencia para acceso rápido
+# Convenience functions for quick access
 def get_logger() -> logging.Logger:
-    """Obtiene la instancia del logger principal"""
+    """Get the main logger instance."""
     return KeyForgeLogger().get_logger()
 
 
 def log_exception(exception: Exception, context: str = ""):
     """
-    Registra una excepción con contexto completo.
+    Log an exception with full context.
     
     Args:
-        exception: La excepción a registrar
-        context: Contexto adicional sobre dónde ocurrió
+        exception: The exception to log
+        context: Additional context about where it occurred
     """
     logger = get_logger()
     
     if context:
-        logger.error(f"Excepción en {context}: {exception}", exc_info=True)
+        logger.error(f"Exception in {context}: {exception}", exc_info=True)
     else:
-        logger.error(f"Excepción: {exception}", exc_info=True)
+        logger.error(f"Exception: {exception}", exc_info=True)
 
 
 def log_startup_info():
-    """Registra información del sistema al inicio"""
+    """Log system information at startup."""
     import platform
     logger = get_logger()
     
-    logger.info("Información del Sistema:")
+    logger.info("System Information:")
     logger.info(f"  OS: {platform.system()} {platform.release()}")
     logger.info(f"  Python: {platform.python_version()}")
-    logger.info(f"  Arquitectura: {platform.machine()}")
-    logger.info(f"  Procesador: {platform.processor()}")
+    logger.info(f"  Architecture: {platform.machine()}")
+    logger.info(f"  Processor: {platform.processor()}")

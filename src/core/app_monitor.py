@@ -1,7 +1,7 @@
 """
 src/core/app_monitor.py
-Monitor de aplicaciones activas - Versión Ultra-Filtrada
-Elimina apps UWP suspendidas, procesos fantasma y ventanas de sistema.
+Active application monitor - Ultra-Filtered Version
+Removes suspended UWP apps, ghost processes, and system windows.
 """
 
 import sys
@@ -19,14 +19,14 @@ except ImportError:
     import logging
     logger = logging.getLogger(__name__)
 
-# --- CONSTANTES WIN32 ---
+# --- WIN32 CONSTANTS ---
 DWMWA_CLOAKED = 13
 GWL_EXSTYLE = -20
 GW_OWNER = 4
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_APPWINDOW = 0x00040000
 
-# Definiciones de tipos para ctypes
+# Type definitions for ctypes
 if sys.platform == 'win32':
     try:
         from ctypes import wintypes
@@ -37,7 +37,7 @@ if sys.platform == 'win32':
 
 class AppMonitor:
     """
-    Monitorea aplicaciones activas con filtrado agresivo de basura del sistema.
+    Monitors active applications with aggressive system-garbage filtering.
     """
     
     def __init__(self):
@@ -45,7 +45,7 @@ class AppMonitor:
         self.enforce_app_focus = True
         self.target_app_is_active = False
         
-        # Caché
+        # Cache
         self._cache = {
             "hwnd": None,
             "title": "",
@@ -53,22 +53,22 @@ class AppMonitor:
         }
         self._cache_timeout = 0.05
         
-        # Inicializar APIs
+        # Initialize APIs
         self._init_win32()
     
     def _init_win32(self):
-        """Inicializa user32 y dwmapi"""
+        """Initialize user32 and dwmapi"""
         if sys.platform == 'win32':
             try:
                 self._user32 = ctypes.windll.user32
                 self._dwmapi = ctypes.windll.dwmapi 
                 self._win32_available = True
-                logger.info("Win32 API + DWM inicializados correctamente")
+                logger.info("Win32 API + DWM initialized successfully")
             except Exception as e:
                 self._user32 = None
                 self._dwmapi = None
                 self._win32_available = False
-                logger.warning(f"Win32 API no disponible: {e}")
+                logger.warning(f"Win32 API unavailable: {e}")
         else:
             self._user32 = None
             self._win32_available = False
@@ -141,7 +141,7 @@ class AppMonitor:
 
     @staticmethod
     def _run_cmd(args) -> str:
-        """Ejecuta un comando externo (wmctrl/xdotool) con timeout corto y sin romper si falla"""
+        """Run an external command (wmctrl/xdotool) with a short timeout and without crashing if it fails"""
         try:
             result = subprocess.run(args, capture_output=True, text=True, timeout=0.5)
             return result.stdout
@@ -153,7 +153,7 @@ class AppMonitor:
         return self.target_app_is_active
     
     # -------------------------------------------------------------------------
-    # ESCANEO DE VENTANAS
+    # WINDOW SCANNING
     # -------------------------------------------------------------------------
     def get_all_windows(self) -> List[str]:
         if self._win32_available:
@@ -163,15 +163,15 @@ class AppMonitor:
 
     def _get_windows_win32_list(self) -> List[str]:
         """
-        Lista ventanas aplicando filtros estrictos para eliminar basura UWP y sistema.
+        Lists windows applying strict filters to remove UWP and system garbage.
         """
         titles = []
         my_pid = os.getpid()
 
-        # LISTA NEGRA: Solo bloquear procesos de sistema que NUNCA queremos targetear.
-        # He eliminado apps como 'Calculator', 'Settings', etc. de esta lista dura
-        # porque tus filtros #3 (Cloaked) y #5 (Dimensiones) ya deberían eliminar
-        # sus versiones fantasma/background.
+        # BLACKLIST: Only block system processes that we NEVER want to target.
+        # I've removed apps like 'Calculator', 'Settings', etc. from this hard list
+        # because your filters #3 (Cloaked) and #5 (Dimensions) should already remove
+        # their ghost/background versions.
         garbage_titles = {
             "Program Manager", 
             "Default IME", 
@@ -186,24 +186,24 @@ class AppMonitor:
             "logs",
             "Configuración",
             "Settings"
-            # Las siguientes han sido removidas para permitir su detección si son ventanas reales:
-            # "Settings", "Configuración", "Calculator", "Calculadora", 
+            # The following have been removed to allow their detection if they are real windows:
+            # "Settings", "Configuración", "Calculator", "Calculadora",
             # "Movies & TV", "Películas y TV"
         }
 
         def enum_window_callback(hwnd, lParam):
-            # 1. Filtro: ¿Es visible?
+            # 1. Filter: Is it visible?
             if not self._user32.IsWindowVisible(hwnd):
                 return True
             
-            # 2. Filtro: Excluir KeyForge
+            # 2. Filter: Exclude KeyForge
             process_id = ctypes.c_ulong()
             self._user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
             if process_id.value == my_pid:
                 return True
 
-            # 3. Filtro DWM: Apps suspendidas (Cloaked)
-            # ESTE ES CLAVE PARA APPS UWP: Elimina Calculadora/Configuración cuando están minimizadas/suspendidas
+            # 3. DWM Filter: Suspended apps (Cloaked)
+            # THIS IS KEY FOR UWP APPS: Removes Calculator/Settings when minimized/suspended
             if self._dwmapi:
                 is_cloaked = ctypes.c_int(0)
                 hr = self._dwmapi.DwmGetWindowAttribute(
@@ -215,7 +215,7 @@ class AppMonitor:
                 if hr == 0 and is_cloaked.value != 0:
                     return True 
 
-            # 4. Filtro Estilo: ToolWindows y Owners
+            # 4. Style Filter: ToolWindows and Owners
             ex_style = self._user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             owner = self._user32.GetWindow(hwnd, GW_OWNER)
             
@@ -224,8 +224,8 @@ class AppMonitor:
             if owner != 0 and not (ex_style & WS_EX_APPWINDOW):
                 return True
 
-            # 5. Filtro de Dimensiones
-            # Elimina ventanas fantasma de 0x0 o 1x1
+            # 5. Dimensions Filter
+            # Removes ghost windows of 0x0 or 1x1
             rect = wintypes.RECT()
             self._user32.GetWindowRect(hwnd, ctypes.byref(rect))
             w = rect.right - rect.left
@@ -233,7 +233,7 @@ class AppMonitor:
             if w < 10 or h < 10:
                 return True
             
-            # 6. Obtener y verificar Título
+            # 6. Get and verify Title
             length = self._user32.GetWindowTextLengthW(hwnd)
             if length == 0:
                 return True
@@ -245,16 +245,16 @@ class AppMonitor:
             if not text.strip():
                 return True
                 
-            # Verificar contra lista negra
+            # Check against blacklist
             if text in garbage_titles:
-                # EXCEPCIÓN INTELIGENTE:
-                # Si por alguna razón una ventana de "basura" (ej. Cortana o Inicio) 
-                # es la ventana ACTIVA (tiene el foco del usuario), permitimos que salga.
-                # Esto cumple con "si están siendo utilizados".
+                # SMART EXCEPTION:
+                # If for any reason a "garbage" window (e.g. Cortana or Start)
+                # is the ACTIVE window (has user focus), we allow it through.
+                # This fulfills the "if they are being used" requirement.
                 active_hwnd = self._user32.GetForegroundWindow()
                 if hwnd != active_hwnd:
                     return True
-                # Si es la ventana activa, pasa aunque esté en lista negra
+                # If it is the active window, let it pass even if blacklisted
             
             titles.append(text)
             return True
@@ -269,7 +269,7 @@ class AppMonitor:
             out = self._run_cmd(["wmctrl", "-l"])
             titles = []
             for line in out.splitlines():
-                # Formato: <id> <desktop> <host> <título...>
+                # Format: <id> <desktop> <host> <title...>
                 parts = line.split(None, 3)
                 if len(parts) == 4 and parts[3].strip():
                     titles.append(parts[3].strip())

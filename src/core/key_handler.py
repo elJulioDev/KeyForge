@@ -1,6 +1,6 @@
 """
-Manejador de eventos de teclado con búsqueda O(1)
-Optimizado para latencia mínima
+Keyboard event handler with O(1) lookup
+Optimized for minimal latency
 """
 
 import keyboard
@@ -9,7 +9,7 @@ import sys
 import os
 from typing import Dict, List, Optional, Tuple
 
-# Logger profesional (se importará del módulo utils)
+# Professional logger (imported from the utils module)
 try:
     from ..utils.logger import get_logger
     logger = get_logger()
@@ -20,11 +20,11 @@ except ImportError:
 
 def _patch_keyboard_linux_root_check():
     """
-    keyboard._nixcommon.ensure_root() exige os.geteuid() == 0 sin mirar
-    los permisos reales de /dev/uinput. Con la regla udev + grupo 'input'
-    (ver README), el acceso real ya existe aunque no seamos root — el
-    chequeo de la librería es innecesariamente estricto para ese caso.
-    Lo reemplazamos por uno que valida acceso real al dispositivo.
+    keyboard._nixcommon.ensure_root() requires os.geteuid() == 0 without looking
+    at the real permissions of /dev/uinput. With the udev rule + 'input' group
+    (see README), real access already exists even if we're not root — the
+    library's check is unnecessarily strict for that case.
+    We replace it with one that validates real access to the device.
     """
     if not sys.platform.startswith('linux'):
         return
@@ -38,18 +38,18 @@ def _patch_keyboard_linux_root_check():
             if os.access('/dev/uinput', os.W_OK):
                 return
             raise ImportError(
-                "Sin acceso a /dev/uinput. Falta el grupo 'input' o la regla "
-                "udev (ver README, sección 'Linux permissions'), o falta "
-                "cerrar sesión tras agregarte al grupo."
+                "No access to /dev/uinput. The 'input' group or the udev rule "
+                "is missing (see README, 'Linux permissions' section), or you "
+                "need to log out after adding yourself to the group."
             )
 
-        # _nixkeyboard hizo "from ._nixcommon import ensure_root" al importarse,
-        # queda un nombre propio en su namespace. Parchear solo _nixcommon no
-        # lo toca; hay que parchear ambos.
+        # _nixkeyboard did "from ._nixcommon import ensure_root" on import,
+        # leaving its own name in its namespace. Patching only _nixcommon won't
+        # affect it; both must be patched.
         _nixcommon.ensure_root = _ensure_device_access
         _nixkeyboard.ensure_root = _ensure_device_access
     except Exception as e:
-        logger.warning(f"No se pudo parchear el chequeo de root de 'keyboard': {e}")
+        logger.warning(f"Could not patch the 'keyboard' root check: {e}")
 
 
 _patch_keyboard_linux_root_check()
@@ -57,15 +57,15 @@ _patch_keyboard_linux_root_check()
 
 def _patch_keyboard_dumpkeys_cache():
     """
-    'dumpkeys' necesita un descriptor de consola real (VT), algo que no
-    existe dentro de una terminal gráfica (Konsole/Wayland/X11). Ahí
-    falla con "Couldn't get a file descriptor referring to the console",
-    incluso teniendo permisos sobre /dev/input y /dev/uinput — es una
-    restricción del kernel (CAP_SYS_TTY_CONFIG), no arreglable con udev.
+    'dumpkeys' needs a real console descriptor (VT), something that doesn't
+    exist inside a graphical terminal (Konsole/Wayland/X11). There it fails
+    with "Couldn't get a file descriptor referring to the console", even with
+    permissions over /dev/input and /dev/uinput — it's a kernel restriction
+    (CAP_SYS_TTY_CONFIG), not fixable with udev.
 
-    Solución: cachear la salida de 'dumpkeys' una sola vez (generada con
-    sudo, o desde una TTY real con Ctrl+Alt+F3) y servirla desde disco en
-    cada arranque normal, sin volver a invocar el binario.
+    Solution: cache the 'dumpkeys' output once (generated with sudo, or from a
+    real TTY with Ctrl+Alt+F3) and serve it from disk on every normal start,
+    without invoking the binary again.
     """
     if not sys.platform.startswith('linux'):
         return
@@ -85,8 +85,8 @@ def _patch_keyboard_dumpkeys_cache():
             if path is not None:
                 if path.exists():
                     return path.read_text(encoding='utf-8')
-                # Primer intento: probar el binario real (root o TTY real)
-                # y, si funciona, guardar el resultado para la próxima vez.
+                # First try: run the real binary (root or real TTY)
+                # and, if it works, save the result for next time.
                 output = original_check_output(cmd, *args, **kwargs)
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 path.write_text(output, encoding='utf-8')
@@ -95,7 +95,7 @@ def _patch_keyboard_dumpkeys_cache():
 
         _nixkeyboard.check_output = _cached_check_output
     except Exception as e:
-        logger.warning(f"No se pudo activar la caché de 'dumpkeys': {e}")
+        logger.warning(f"Could not enable the 'dumpkeys' cache: {e}")
 
 
 _patch_keyboard_dumpkeys_cache()
@@ -103,23 +103,23 @@ _patch_keyboard_dumpkeys_cache()
 
 def _patch_keyboard_linux_real_suppress():
     """
-    La librería 'keyboard' documenta (README propio): "Key
-    suppression/blocking only available on Windows". En Linux
-    _nixkeyboard.listen() lee /dev/input/eventN de forma pasiva y
-    descarta el valor de retorno del callback -> la tecla original
-    SIEMPRE llega al sistema, sin importar si hay una regla que la
-    reemplaza. Resultado: "A"->"S" escribe "AS", no "S".
+    The 'keyboard' library documents (its own README): "Key
+    suppression/blocking only available on Windows". On Linux
+    _nixkeyboard.listen() reads /dev/input/eventN passively and discards the
+    callback's return value -> the original key ALWAYS reaches the system,
+    regardless of whether there's a rule replacing it. Result: "A"->"S" types
+    "AS", not "S".
 
-    Fix real (lo que en Windows hace el driver, aquí lo hacemos a mano):
-      1. EVIOCGRAB sobre cada dispositivo físico de teclado: deja de
-         entregarle eventos a nadie más (Wayland/X11 incluidos).
-      2. Reinyectamos por el dispositivo virtual (uinput) toda tecla
-         que el callback NO bloquee, para no perder el resto del teclado.
+    Real fix (what the driver does on Windows, we do it by hand here):
+      1. EVIOCGRAB on each physical keyboard device: it stops delivering
+         events to anyone else (Wayland/X11 included).
+      2. We re-inject through the virtual device (uinput) every key that the
+         callback does NOT block, so the rest of the keyboard is not lost.
 
-    De paso, evita el `exit()` que la librería llama dentro del hilo de
-    lectura cuando un dispositivo da "Permission denied" (p.ej. algún
-    evento ACPI tipo botón de energía sin acceso): ahora ese dispositivo
-    simplemente se ignora en vez de imprimir el aviso y matar su hilo.
+    Along the way, it avoids the `exit()` that the library calls inside the
+    reader thread when a device returns "Permission denied" (e.g. some ACPI
+    power-button event without access): now that device is simply ignored
+    instead of printing the warning and killing its thread.
     """
     if not sys.platform.startswith('linux'):
         return
@@ -136,16 +136,16 @@ def _patch_keyboard_linux_real_suppress():
                     self._input_file = open(self.path, 'rb')
                 except IOError as e:
                     if e.strerror == 'Permission denied':
-                        logger.warning(f"Sin acceso a {self.path}, se ignora ese dispositivo.")
+                        logger.warning(f"No access to {self.path}, that device is ignored.")
                     else:
-                        logger.warning(f"No se pudo abrir {self.path}: {e}")
+                        logger.warning(f"Could not open {self.path}: {e}")
                     return None
 
                 if self.path != 'uinput Fake Device':
                     try:
                         fcntl.ioctl(self._input_file, EVIOCGRAB, 1)
                     except OSError as e:
-                        logger.warning(f"No se pudo reservar {self.path} (EVIOCGRAB): {e}")
+                        logger.warning(f"Could not grab {self.path} (EVIOCGRAB): {e}")
 
                 import atexit as _atexit
                 def try_close():
@@ -164,8 +164,8 @@ def _patch_keyboard_linux_real_suppress():
         def _safe_read_event(self):
             f = self.input_file
             if f is None:
-                # Dispositivo sin acceso: este hilo no puede leer nada,
-                # se queda inactivo en vez de reventar con AttributeError.
+                # Device without access: this thread cannot read anything,
+                # it stays idle instead of blowing up with AttributeError.
                 _threading.Event().wait()
             data = f.read(_struct.calcsize(_nixcommon.event_bin_format))
             seconds, microseconds, type_, code, value = _struct.unpack(_nixcommon.event_bin_format, data)
@@ -204,21 +204,21 @@ def _patch_keyboard_linux_real_suppress():
                     modifiers=pressed_modifiers_tuple,
                 )
 
-                # Si el callback no bloquea la tecla, la reinyectamos
-                # nosotros mismos: el grab se la quitó al sistema.
+                # If the callback doesn't block the key, we re-inject it
+                # ourselves: the grab took it away from the system.
                 if callback(event) is not False:
                     device.write_event(_nixcommon.EV_KEY, scan_code, value)
 
         _nixkeyboard.listen = _passthrough_listen
     except Exception as e:
-        logger.warning(f"No se pudo activar el suppress real en Linux: {e}")
+        logger.warning(f"Could not enable real suppress on Linux: {e}")
 
 
 _patch_keyboard_linux_real_suppress()
 
 
 class KeyRule:
-    """Representa una regla individual de remapeo"""
+    """Represents a single remapping rule"""
     
     __slots__ = ('key_to_replace', 'replacement_key', 'mode', 'enabled', 'toggle_state_active')
     
@@ -230,7 +230,7 @@ class KeyRule:
         self.toggle_state_active = False
         
     def to_dict(self) -> dict:
-        """Convierte la regla a diccionario para guardar"""
+        """Convert the rule to a dictionary for saving"""
         return {
             "key_to_replace": self.key_to_replace,
             "replacement_key": self.replacement_key,
@@ -240,7 +240,7 @@ class KeyRule:
     
     @staticmethod
     def from_dict(data: dict) -> 'KeyRule':
-        """Crea una regla desde un diccionario"""
+        """Create a rule from a dictionary"""
         return KeyRule(
             data.get("key_to_replace", ""),
             data.get("replacement_key", ""),
@@ -251,104 +251,104 @@ class KeyRule:
 
 class KeyHandler:
     """
-    Gestiona la captura y reemplazo de teclas con múltiples reglas.
-    Optimizado con hash map para búsqueda O(1).
+    Manages key capture and replacement with multiple rules.
+    Optimized with a hash map for O(1) lookup.
     """
 
     def __init__(self, app_monitor):
         self.app_monitor = app_monitor
         self.key_hook = None
         
-        # Doble estructura de datos
-        self._rules_map: Dict[str, KeyRule] = {}  # Para búsqueda O(1) rápida
-        self._rules_list: List[KeyRule] = []      # Para UI/persistencia/orden
+        # Dual data structure
+        self._rules_map: Dict[str, KeyRule] = {}  # For fast O(1) lookup
+        self._rules_list: List[KeyRule] = []      # For UI/persistence/order
         
         self._tk_root = None
-        self._active_keys = set()  # Prevenir recursión
+        self._active_keys = set()  # Prevent recursion
         
-        # Métricas de rendimiento (opcional)
+        # Performance metrics (optional)
         self._latency_samples = []
         self._last_perf_log = time.time()
         
     def set_tk_root(self, root):
-        """Establece la referencia al root de Tkinter para operaciones thread-safe"""
+        """Sets the reference to the Tkinter root for thread-safe operations"""
         self._tk_root = root
     
     def add_rule(self, key_to_replace: str, replacement_key: str, 
                  mode: str = "hold", enabled: bool = True) -> Tuple[bool, Optional[str]]:
         """
-        Agrega una nueva regla de remapeo.
+        Add a new remapping rule.
         
         Returns:
             (success: bool, error_key: Optional[str])
         """
-        # Verificar recursión circular ANTES de agregar
+        # Check for circular recursion BEFORE adding
         if self._would_create_cycle(key_to_replace, replacement_key):
-            logger.warning(f"Ciclo circular detectado: {key_to_replace} -> {replacement_key}")
+            logger.warning(f"Circular cycle detected: {key_to_replace} -> {replacement_key}")
             return False, "error_circular"
         
         rule = KeyRule(key_to_replace, replacement_key, mode, enabled)
         
-        # Agregar a lista (orden de creación)
+        # Add to list (creation order)
         self._rules_list.append(rule)
         
-        # Agregar al mapa solo si está habilitada
+        # Add to map only if enabled
         if enabled:
             self._rules_map[key_to_replace] = rule
         
-        logger.info(f"Regla agregada: {key_to_replace} -> {replacement_key} [{mode}]")
+        logger.info(f"Rule added: {key_to_replace} -> {replacement_key} [{mode}]")
         return True, None
     
     def remove_rule(self, index: int) -> bool:
-        """Elimina una regla por índice"""
+        """Remove a rule by index"""
         if not 0 <= index < len(self._rules_list):
-            logger.error(f"Índice de regla inválido: {index}")
+            logger.error(f"Invalid rule index: {index}")
             return False
         
         rule = self._rules_list.pop(index)
         
-        # Remover del mapa si estaba ahí
+        # Remove from map if it was there
         if rule.key_to_replace in self._rules_map:
             del self._rules_map[rule.key_to_replace]
         
-        logger.info(f"Regla eliminada: {rule.key_to_replace} -> {rule.replacement_key}")
+        logger.info(f"Rule removed: {rule.key_to_replace} -> {rule.replacement_key}")
         return True
     
     def update_rule(self, index: int, key_to_replace: str, replacement_key: str, 
                     mode: str, enabled: bool) -> Tuple[bool, Optional[str]]:
-        """Actualiza una regla existente"""
+        """Update an existing rule"""
         if not 0 <= index < len(self._rules_list):
             return False, "error_invalid_index"
         
         old_rule = self._rules_list[index]
         
-        # Verificar recursión solo si cambió la tecla
+        # Check recursion only if the key changed
         if (old_rule.key_to_replace != key_to_replace or 
             old_rule.replacement_key != replacement_key):
             if self._would_create_cycle(key_to_replace, replacement_key, exclude_index=index):
                 return False, "error_circular"
         
-        # Remover la regla antigua del mapa
+        # Remove the old rule from the map
         if old_rule.key_to_replace in self._rules_map:
             del self._rules_map[old_rule.key_to_replace]
         
-        # Actualizar regla
+        # Update rule
         new_rule = KeyRule(key_to_replace, replacement_key, mode, enabled)
         self._rules_list[index] = new_rule
         
-        # Agregar al mapa si está habilitada
+        # Add to map if enabled
         if enabled:
             self._rules_map[key_to_replace] = new_rule
         
-        logger.info(f"Regla actualizada [{index}]: {key_to_replace} -> {replacement_key}")
+        logger.info(f"Rule updated [{index}]: {key_to_replace} -> {replacement_key}")
         return True, None
     
     def get_rules(self) -> List[KeyRule]:
-        """Obtiene todas las reglas (para UI)"""
+        """Get all rules (for UI)"""
         return self._rules_list
     
     def load_rules(self, rules_data: List[dict]):
-        """Carga reglas desde datos guardados"""
+        """Load rules from saved data"""
         self._rules_list.clear()
         self._rules_map.clear()
         
@@ -359,16 +359,16 @@ class KeyHandler:
             if rule.enabled:
                 self._rules_map[rule.key_to_replace] = rule
         
-        logger.info(f"Cargadas {len(self._rules_list)} reglas ({len(self._rules_map)} activas)")
+        logger.info(f"Loaded {len(self._rules_list)} rules ({len(self._rules_map)} active)")
     
     def _would_create_cycle(self, key_to_replace: str, replacement_key: str, 
                            exclude_index: Optional[int] = None) -> bool:
         """
-        Detecta ciclos de remapeo circulares usando DFS.
-        Ej: A->B, B->C, C->A crea un ciclo infinito.
-        Usa el mapa interno directamente.
+        Detects circular remapping cycles using DFS.
+        E.g.: A->B, B->C, C->A creates an infinite cycle.
+        Uses the internal map directly.
         """
-        # Construir grafo temporal de dependencias
+        # Build temporary dependency graph
         graph = {}
         
         for i, rule in enumerate(self._rules_list):
@@ -378,12 +378,12 @@ class KeyHandler:
                 graph[rule.key_to_replace] = []
             graph[rule.key_to_replace].append(rule.replacement_key)
         
-        # Agregar la nueva regla al grafo
+        # Add the new rule to the graph
         if key_to_replace not in graph:
             graph[key_to_replace] = []
         graph[key_to_replace].append(replacement_key)
         
-        # DFS para detectar ciclos
+        # DFS to detect cycles
         def has_cycle(node: str, visited: set, rec_stack: set) -> bool:
             visited.add(node)
             rec_stack.add(node)
@@ -408,32 +408,32 @@ class KeyHandler:
 
     def handle_key_event(self, e) -> bool:
         """
-        Maneja todos los eventos de teclado capturados por el hook.
-        Búsqueda O(1) con hash map - latencia mínima
+        Handles all keyboard events captured by the hook.
+        O(1) lookup with hash map - minimal latency
         """
-        # Benchmark de latencia (opcional)
+        # Latency benchmark (optional)
         start = time.perf_counter() if __debug__ else None
         
         try:
-            # Ignorar si la app objetivo no está activa
+            # Ignore if the target app is not active
             if not self.app_monitor.target_app_is_active:
                 return True
             
-            # Prevenir recursión: si la tecla ya está siendo procesada
+            # Prevent recursion: if the key is already being processed
             if e.name in self._active_keys:
                 return True
             
-            # BÚSQUEDA O(1) - La magia está aquí
+            # O(1) LOOKUP - The magic is here
             rule = self._rules_map.get(e.name)
             
             if not rule:
-                return True  # No hay regla, dejar pasar la tecla
+                return True  # No rule, let the key through
             
-            # Marcar tecla como activa para prevenir recursión
+            # Mark key as active to prevent recursion
             self._active_keys.add(e.name)
             
             try:
-                # Lógica según el modo de la regla
+                # Logic according to the rule's mode
                 if rule.mode == 'hold':
                     if e.event_type == keyboard.KEY_DOWN:
                         keyboard.press(rule.replacement_key)
@@ -449,46 +449,46 @@ class KeyHandler:
                             keyboard.press(rule.replacement_key)
                             rule.toggle_state_active = True
                 
-                # Bloquear la tecla original
+                # Block the original key
                 return False
                 
             finally:
-                # Liberar la tecla del conjunto activo
+                # Release the key from the active set
                 self._active_keys.discard(e.name)
         
         finally:
-            # Logging de rendimiento (cada 1000 eventos)
+            # Performance logging (every 1000 events)
             if start and __debug__:
                 latency_ms = (time.perf_counter() - start) * 1000
                 self._latency_samples.append(latency_ms)
                 
                 if len(self._latency_samples) >= 1000:
                     avg = sum(self._latency_samples) / len(self._latency_samples)
-                    logger.debug(f"Latencia promedio: {avg:.3f}ms (1000 eventos)")
+                    logger.debug(f"Average latency: {avg:.3f}ms (1000 events)")
                     self._latency_samples.clear()
 
     def start(self) -> Tuple[bool, Optional[str]]:
-        """Inicia la captura de teclas"""
+        """Start key capture"""
         if self.key_hook:
             return False, "error_hook_active"
         
         if not self._rules_map:
-            logger.warning("Intento de iniciar sin reglas activas")
+            logger.warning("Attempted to start without active rules")
             return False, "No active rules"
         
         try:
-            logger.info(f"Iniciando hooks con {len(self._rules_map)} reglas activas")
+            logger.info(f"Starting hooks with {len(self._rules_map)} active rules")
             self.key_hook = keyboard.hook(self.handle_key_event, suppress=True)
             return True, None
         except ImportError as e:
-            logger.error(f"Error de permisos: {e}")
+            logger.error(f"Permission error: {e}")
             return False, "error_admin_required"
         except Exception as e:
-            logger.error(f"Error inesperado al iniciar: {e}", exc_info=True)
+            logger.error(f"Unexpected error starting: {e}", exc_info=True)
             return False, f"error_unexpected: {e}"
 
     def stop(self) -> bool:
-        """Detiene la captura de teclas"""
+        """Stop key capture"""
         if not self.key_hook:
             return False
         
@@ -496,27 +496,27 @@ class KeyHandler:
             keyboard.unhook(self.key_hook)
             self.key_hook = None
             
-            # Liberar todas las teclas toggle activas
+            # Release all active toggle keys
             for rule in self._rules_list:
                 if rule.toggle_state_active:
                     keyboard.release(rule.replacement_key)
                     rule.toggle_state_active = False
             
             self._active_keys.clear()
-            logger.info("Hooks detenidos correctamente")
+            logger.info("Hooks stopped successfully")
             return True
         except Exception as e:
-            logger.error(f"Error al detener hooks: {e}", exc_info=True)
+            logger.error(f"Error stopping hooks: {e}", exc_info=True)
             return False
 
     def is_active(self) -> bool:
-        """Verifica si el hook está activo"""
+        """Check if the hook is active"""
         return self.key_hook is not None
 
     def listen_for_key(self, callback):
         """
-        Escucha y captura la siguiente tecla presionada.
-        Thread-safe con Tkinter.
+        Listens for and captures the next pressed key.
+        Thread-safe with Tkinter.
         """
         def capture():
             try:
@@ -525,7 +525,7 @@ class KeyHandler:
                     key = keyboard.read_event(suppress=False)
                 
                 captured_key = key.name
-                logger.debug(f"Tecla capturada: {captured_key}")
+                logger.debug(f"Key captured: {captured_key}")
                 
                 if self._tk_root:
                     self._tk_root.after(0, lambda: callback(captured_key, None))
@@ -533,7 +533,7 @@ class KeyHandler:
                     callback(captured_key, None)
                     
             except Exception as e:
-                logger.error(f"Error capturando tecla: {e}", exc_info=True)
+                logger.error(f"Error capturing key: {e}", exc_info=True)
                 if self._tk_root:
                     self._tk_root.after(0, lambda: callback(None, str(e)))
                 else:
@@ -543,22 +543,22 @@ class KeyHandler:
         thread = threading.Thread(target=capture, daemon=True)
         thread.start()
 
-    # MÉTODOS DE COMPATIBILIDAD (Para no romper código existente)
+    # COMPATIBILITY METHODS (To avoid breaking existing code)
 
     def set_keys(self, key_to_replace: str, replacement_key: str):
         """
-        DEPRECADO: Usa add_rule() para múltiples reglas.
-        Mantenido por retrocompatibilidad.
+        DEPRECATED: Use add_rule() for multiple rules.
+        Kept for backward compatibility.
         """
-        logger.warning("set_keys() está deprecado. Usa add_rule() en su lugar.")
+        logger.warning("set_keys() is deprecated. Use add_rule() instead.")
         self._rules_list.clear()
         self._rules_map.clear()
         self.add_rule(key_to_replace, replacement_key, mode="hold", enabled=True)
     
     def set_mode(self, mode: str):
         """
-        DEPRECADO: Usa update_rule() para configurar reglas individuales.
+        DEPRECATED: Use update_rule() to configure individual rules.
         """
-        logger.warning("set_mode() está deprecado. Usa update_rule() en su lugar.")
+        logger.warning("set_mode() is deprecated. Use update_rule() instead.")
         for rule in self._rules_list:
             rule.mode = mode

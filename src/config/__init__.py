@@ -1,5 +1,5 @@
 """
-Módulo de configuración y constantes
+Configuration and constants module
 """
 from .constants import (
     BASE_DIR,
