@@ -7,9 +7,13 @@ Removes suspended UWP apps, ghost processes, and system windows.
 import sys
 import os
 import time
+import json
+import ast
 import ctypes
 import subprocess
 import shutil
+import tempfile
+from pathlib import Path
 from typing import List, Optional, Callable
 
 try:
@@ -55,13 +59,86 @@ class AppMonitor:
         
         # Initialize APIs
         self._init_win32()
+        self._detect_session()
+    
+    def _detect_session(self):
+        """
+        Detects the current desktop session and which backend can detect
+        windows. Populates:
+        - self.session: 'windows' | 'x11' | 'wayland'
+        - self.wm: which compositor is running ('kwin', 'mutter', 'sway',
+          'hyprland', 'generic', or None when undetectable)
+        """
+        if sys.platform == 'win32':
+            self.session = 'windows'
+            self.wm = 'windows'
+            return
+
+        self.session = 'wayland' if os.environ.get('WAYLAND_DISPLAY') else 'x11'
+
+        desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+        session_desktop = os.environ.get('XDG_SESSION_DESKTOP', '').lower()
+        combined = f"{desktop} {session_desktop}"
+
+        if 'kde' in combined or 'plasma' in combined:
+            self.wm = 'kwin'
+        elif 'gnome' in combined or 'unity' in combined:
+            self.wm = 'mutter'
+        elif 'sway' in combined:
+            self.wm = 'sway'
+        elif 'hyprland' in combined:
+            self.wm = 'hyprland'
+        else:
+            self.wm = 'generic'
+
+    def supports_window_detection(self) -> bool:
+        """
+        True when the current session can detect windows (both the window
+        list and the active window). On sessions where no backend applies,
+        the focus feature is hidden in the UI.
+        """
+        if self.session == 'windows':
+            return self._win32_available
+        if self.session == 'x11':
+            return bool(shutil.which('wmctrl') or shutil.which('xdotool'))
+        # Wayland
+        if self.wm == 'kwin':
+            return bool(shutil.which('dbus-send'))
+        if self.wm == 'mutter':
+            return bool(shutil.which('gdbus'))
+        if self.wm == 'sway':
+            return bool(shutil.which('swaymsg'))
+        if self.wm == 'hyprland':
+            return bool(shutil.which('hyprctl'))
+        return False
     
     def _init_win32(self):
-        """Initialize user32 and dwmapi"""
+        """Initialize user32 and dwmapi with proper ctypes signatures"""
         if sys.platform == 'win32':
             try:
                 self._user32 = ctypes.windll.user32
-                self._dwmapi = ctypes.windll.dwmapi 
+                self._dwmapi = ctypes.windll.dwmapi
+
+                # Set proper argtypes/restype to avoid 32-bit truncation of
+                # HWND values on 64-bit Windows.
+                self._user32.IsWindowVisible.argtypes = [wintypes.HWND]
+                self._user32.IsWindowVisible.restype = wintypes.BOOL
+                self._user32.GetWindowThreadProcessId.argtypes = [
+                    wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+                self._user32.GetWindowRect.argtypes = [
+                    wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+                self._user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+                self._user32.GetWindowTextW.argtypes = [
+                    wintypes.HWND, ctypes.c_wchar_p, ctypes.c_int]
+                self._user32.GetForegroundWindow.restype = wintypes.HWND
+                self._user32.GetWindow.argtypes = [wintypes.HWND, ctypes.c_uint]
+                self._user32.GetWindow.restype = wintypes.HWND
+                self._user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+                self._dwmapi.DwmGetWindowAttribute.argtypes = [
+                    wintypes.HWND, wintypes.DWORD,
+                    ctypes.c_void_p, wintypes.DWORD]
+                self._dwmapi.DwmGetWindowAttribute.restype = ctypes.c_long
+
                 self._win32_available = True
                 logger.info("Win32 API + DWM initialized successfully")
             except Exception as e:
@@ -72,6 +149,35 @@ class AppMonitor:
         else:
             self._user32 = None
             self._win32_available = False
+
+    def _get_window_long(self, hwnd, index):
+        """Reads a window long value using the 64-bit-aware API on Windows"""
+        if sys.platform == 'win32':
+            try:
+                func = getattr(self._user32, 'GetWindowLongPtrW', None)
+                if func is None:
+                    func = self._user32.GetWindowLongW
+                func.argtypes = [wintypes.HWND, ctypes.c_int]
+                func.restype = ctypes.c_ssize_t
+                return func(hwnd, index)
+            except Exception:
+                try:
+                    return self._user32.GetWindowLongW(hwnd, index)
+                except Exception:
+                    return 0
+        return 0
+
+    def _get_window_title(self, hwnd):
+        """Gets the title of a window by handle (Win32)"""
+        try:
+            length = self._user32.GetWindowTextLengthW(hwnd)
+            if length == 0:
+                return ""
+            buffer = ctypes.create_unicode_buffer(length + 1)
+            self._user32.GetWindowTextW(hwnd, buffer, length + 1)
+            return buffer.value
+        except Exception:
+            return ""
     
     def set_target_app(self, app_name: str):
         self.target_app_name = app_name
@@ -82,11 +188,10 @@ class AppMonitor:
     def is_target_app_active(self) -> bool:
         if not self.enforce_app_focus:
             return True
+        if not self.supports_window_detection():
+            return True
         try:
-            if self._win32_available:
-                active_title = self._get_active_window_win32()
-            else:
-                active_title = self._get_active_window_fallback()
+            active_title = self._get_active_window()
             
             if active_title and self.target_app_name.lower() in active_title.lower():
                 return True
@@ -94,6 +199,131 @@ class AppMonitor:
             pass
         return False
     
+    def _get_active_window(self) -> str:
+        """Routes active-window detection to the backend for this session."""
+        if self.session == 'windows':
+            return self._get_active_window_win32()
+        if self.session == 'x11':
+            return self._get_active_window_fallback()
+        if self.wm == 'kwin':
+            return self._get_active_window_kwin()
+        if self.wm == 'mutter':
+            return self._get_active_window_gnome()
+        if self.wm == 'sway':
+            return self._get_active_window_sway()
+        if self.wm == 'hyprland':
+            return self._get_active_window_hyprland()
+        return ""
+    
+    def _get_active_window_kwin(self) -> str:
+        """
+        Gets the title of the currently focused window on KDE Wayland.
+
+        Uses a KWin scripting snippet whose print() lands in the user
+        journal; the marker line is then read back with journalctl.
+        Returns "" if KWin/D-Bus is unavailable.
+        """
+        current_time = time.time()
+        if (current_time - self._cache["timestamp"]) < self._cache_timeout and self._cache["hwnd"] == "kwin":
+            return self._cache["title"]
+
+        title = self._run_kwin_script_active_window()
+
+        self._cache = {"hwnd": "kwin", "title": title, "timestamp": current_time}
+        return title
+
+    def _run_kwin_script_active_window(self) -> str:
+        """Loads and runs a KWin script that prints the active window caption."""
+        cmd = shutil.which("qdbus6") or shutil.which("qdbus")
+        if not cmd or not shutil.which("journalctl"):
+            return ""
+
+        script = 'var w = workspace.activeWindow;\nprint("KEYFORGE_ACTIVE:" + (w ? w.caption : "NONE"));\n'
+        script_path = Path(tempfile.gettempdir()) / "kwin_active_window.js"
+        try:
+            if not script_path.exists() or script_path.read_text(encoding="utf-8") != script:
+                script_path.write_text(script, encoding="utf-8")
+        except Exception:
+            return ""
+
+        try:
+            subprocess.run([cmd, "org.kde.KWin", "/Scripting",
+                            "org.kde.kwin.Scripting.loadScript", str(script_path)],
+                           capture_output=True, text=True, timeout=2.0)
+            subprocess.run([cmd, "org.kde.KWin", "/Scripting",
+                            "org.kde.kwin.Scripting.start"],
+                           capture_output=True, text=True, timeout=2.0)
+        except Exception:
+            return ""
+
+        try:
+            result = subprocess.run(
+                ["journalctl", "--user", "-o", "cat", "--since=5 seconds ago",
+                 "--no-pager"],
+                capture_output=True, text=True, timeout=2.0)
+        except Exception:
+            return ""
+
+        for line in result.stdout.splitlines():
+            if line.startswith("KEYFORGE_ACTIVE:"):
+                return line.split(":", 1)[1].strip()
+        return ""
+
+    def _get_active_window_gnome(self) -> str:
+        """Gets the focused window title on GNOME (Wayland or X11)."""
+        if not shutil.which("gdbus"):
+            return ""
+        out = self._run_cmd(
+            ["gdbus", "call", "--session",
+             "--dest", "org.gnome.Shell",
+             "--object-path", "/org/gnome/Shell",
+             "--method", "org.gnome.Shell.Eval",
+             "global.display.focus_window?.get_title() || ''"])
+        # gdbus returns a tuple like ('Title',) or ('',)
+        try:
+            result = ast.literal_eval(out)
+            if isinstance(result, tuple) and result:
+                return result[0] or ""
+        except Exception:
+            pass
+        return ""
+
+    def _get_active_window_sway(self) -> str:
+        """Gets the focused window title on Sway via swaymsg tree."""
+        if not shutil.which("swaymsg"):
+            return ""
+        out = self._run_cmd(["swaymsg", "-t", "get_tree"])
+        if not out:
+            return ""
+        try:
+            tree = json.loads(out)
+        except Exception:
+            return ""
+
+        def find_focused(node):
+            if node.get("focused") and node.get("name"):
+                return node["name"]
+            for child in node.get("nodes", []) + node.get("floating_nodes", []):
+                title = find_focused(child)
+                if title:
+                    return title
+            return ""
+
+        return find_focused(tree)
+
+    def _get_active_window_hyprland(self) -> str:
+        """Gets the focused window title on Hyprland via hyprctl."""
+        if not shutil.which("hyprctl"):
+            return ""
+        out = self._run_cmd(["hyprctl", "activewindow", "-j"])
+        if not out:
+            return ""
+        try:
+            data = json.loads(out)
+            return data.get("title") or ""
+        except Exception:
+            return ""
+
     def _get_active_window_win32(self) -> str:
         current_time = time.time()
         if (current_time - self._cache["timestamp"]) < self._cache_timeout:
@@ -143,7 +373,7 @@ class AppMonitor:
     def _run_cmd(args) -> str:
         """Run an external command (wmctrl/xdotool) with a short timeout and without crashing if it fails"""
         try:
-            result = subprocess.run(args, capture_output=True, text=True, timeout=0.5)
+            result = subprocess.run(args, capture_output=True, text=True, timeout=2.0)
             return result.stdout
         except Exception:
             return ""
@@ -156,14 +386,27 @@ class AppMonitor:
     # WINDOW SCANNING
     # -------------------------------------------------------------------------
     def get_all_windows(self) -> List[str]:
-        if self._win32_available:
+        if self.session == 'windows':
             return self._get_windows_win32_list()
-        else:
+        if self.session == 'x11':
             return self._get_windows_fallback_list()
+        if self.wm == 'kwin':
+            return self._get_windows_kwin_list()
+        if self.wm == 'mutter':
+            return self._get_windows_gnome_list()
+        if self.wm == 'sway':
+            return self._get_windows_sway_list()
+        if self.wm == 'hyprland':
+            return self._get_windows_hyprland_list()
+        return []
 
     def _get_windows_win32_list(self) -> List[str]:
         """
         Lists windows applying strict filters to remove UWP and system garbage.
+
+        If the strict filters drop every window (e.g. a DWM/theme edge case on
+        a given Windows build), falls back to a lenient pass so the app list
+        is never empty while real windows exist.
         """
         titles = []
         my_pid = os.getpid()
@@ -197,7 +440,7 @@ class AppMonitor:
                 return True
             
             # 2. Filter: Exclude KeyForge
-            process_id = ctypes.c_ulong()
+            process_id = wintypes.DWORD()
             self._user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
             if process_id.value == my_pid:
                 return True
@@ -216,7 +459,7 @@ class AppMonitor:
                     return True 
 
             # 4. Style Filter: ToolWindows and Owners
-            ex_style = self._user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            ex_style = self._get_window_long(hwnd, GWL_EXSTYLE)
             owner = self._user32.GetWindow(hwnd, GW_OWNER)
             
             if (ex_style & WS_EX_TOOLWINDOW) and not (ex_style & WS_EX_APPWINDOW):
@@ -234,15 +477,8 @@ class AppMonitor:
                 return True
             
             # 6. Get and verify Title
-            length = self._user32.GetWindowTextLengthW(hwnd)
-            if length == 0:
-                return True
-                
-            buff = ctypes.create_unicode_buffer(length + 1)
-            self._user32.GetWindowTextW(hwnd, buff, length + 1)
-            text = buff.value
-            
-            if not text.strip():
+            text = self._get_window_title(hwnd)
+            if not text or not text.strip():
                 return True
                 
             # Check against blacklist
@@ -262,26 +498,185 @@ class AppMonitor:
         if WNDENUMPROC:
             self._user32.EnumWindows(WNDENUMPROC(enum_window_callback), 0)
         
+        if titles:
+            return sorted(list(set(titles)))
+
+        # STRICT FILTERS RETURNED NOTHING: retry with a lenient pass so the
+        # dropdown is never empty while there are real, titled, visible windows.
+        logger.warning("Strict window filters returned no titles; using lenient fallback")
+        return self._get_windows_lenient_list(my_pid)
+
+    def _get_windows_lenient_list(self, my_pid) -> List[str]:
+        """Minimal filter: visible windows with a non-empty title, excluding KeyForge."""
+        titles = []
+
+        def enum_window_callback(hwnd, lParam):
+            if not self._user32.IsWindowVisible(hwnd):
+                return True
+            process_id = wintypes.DWORD()
+            self._user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
+            if process_id.value == my_pid:
+                return True
+            text = self._get_window_title(hwnd)
+            if text and text.strip():
+                titles.append(text)
+            return True
+
+        if WNDENUMPROC:
+            self._user32.EnumWindows(WNDENUMPROC(enum_window_callback), 0)
         return sorted(list(set(titles)))
 
     def _get_windows_fallback_list(self) -> List[str]:
+        """
+        Lists windows on non-Windows platforms.
+
+        Combines results from every tool that works on the current session:
+        - Wayland (KDE): KWin windows runner via D-Bus
+        - X11: wmctrl + xdotool
+        - fallback: pygetwindow
+
+        Results are unioned and deduplicated instead of stopping at the first
+        tool that returns something, because a tool may miss windows the
+        others find. KeyForge's own window is skipped so the target dropdown
+        never contains the app itself.
+        """
+        titles = []
+
+        # Method 1 (Wayland/KDE): KWin windows runner over D-Bus. Native
+        # Wayland windows are invisible to wmctrl/xdotool (X11 only), so on
+        # Wayland this is the only reliable source.
+        if self._is_wayland_session():
+            titles += self._get_windows_kwin_list()
+
+        # Method 2: wmctrl -l (X11)
         if shutil.which("wmctrl"):
             out = self._run_cmd(["wmctrl", "-l"])
-            titles = []
             for line in out.splitlines():
                 # Format: <id> <desktop> <host> <title...>
                 parts = line.split(None, 3)
                 if len(parts) == 4 and parts[3].strip():
                     titles.append(parts[3].strip())
-            if titles:
-                return sorted(set(titles))
 
+        # Method 3: xdotool (finds windows wmctrl may miss)
+        if shutil.which("xdotool"):
+            # "." matches name, class, classname and role of visible windows;
+            # then fetch each title individually (getwindowname is reliable).
+            out = self._run_cmd(["xdotool", "search", "--onlyvisible", "."])
+            for win_id in out.split():
+                name = self._run_cmd(["xdotool", "getwindowname", win_id]).strip()
+                if name:
+                    titles.append(name)
+
+        # Method 4: pygetwindow (last resort)
         try:
             import pygetwindow as gw
-            all_windows = gw.getAllTitles()
-            return sorted(list(set(w for w in all_windows if w.strip())))
+            titles += [w for w in gw.getAllTitles() if w.strip()]
+        except Exception:
+            pass
+
+        # Exclude KeyForge's own window and deduplicate
+        return sorted(set(
+            t for t in titles
+            if t.strip() and not t.lower().startswith("keyforge")
+        ))
+
+    @staticmethod
+    def _is_wayland_session() -> bool:
+        """True if the session runs under Wayland."""
+        return os.environ.get("WAYLAND_DISPLAY") is not None
+
+    def _get_windows_kwin_list(self) -> List[str]:
+        """
+        Lists windows on KDE Plasma via the KWin windows runner (D-Bus).
+
+        Works for native Wayland windows that wmctrl/xdotool cannot see.
+        Returns empty list if KWin/D-Bus is unavailable.
+        """
+        cmd = shutil.which("dbus-send")
+        if not cmd:
+            return []
+        try:
+            result = subprocess.run(
+                [cmd, "--session", "--print-reply=literal",
+                 "--dest=org.kde.KWin", "/WindowsRunner",
+                 "org.kde.krunner1.Match", "string:"],
+                capture_output=True, text=True, timeout=2.0)
         except Exception:
             return []
+        if result.returncode != 0:
+            return []
+
+        # Each window is a struct:  0_<uuid>   <title>   int32 <relevance>
+        # The title is the text between the uuid and the 'int32' field.
+        import re
+        titles = []
+        for m in re.finditer(r"0_\{[^}]+\}\s+(.*?)\s{2,}int32\s+\d+", result.stdout):
+            title = m.group(1).strip()
+            if not title:
+                continue
+            # KRunner appends the .desktop id (e.g. "org.kde.dolphin",
+            # "utilities-terminal") after several spaces; strip it.
+            title = re.sub(r"\s{2,}\S.*$", "", title).strip()
+            if title:
+                titles.append(title)
+        return list(dict.fromkeys(titles))
+
+    def _get_windows_gnome_list(self) -> List[str]:
+        """Lists window titles on GNOME via the Shell's window introspection."""
+        if not shutil.which("gdbus"):
+            return []
+        out = self._run_cmd(
+            ["gdbus", "call", "--session",
+             "--dest", "org.gnome.Shell",
+             "--object-path", "/org/gnome/Shell",
+             "--method", "org.gnome.Shell.Eval",
+             "JSON.stringify(global.get_window_actors().map(a => a.meta_window.get_title()))"])
+        # gdbus returns a tuple like ('["A", "B"]',)
+        try:
+            result = ast.literal_eval(out)
+            if isinstance(result, tuple) and result:
+                titles = json.loads(result[0])
+                return sorted(set(t for t in titles if t and not t.lower().startswith("keyforge")))
+        except Exception:
+            pass
+        return []
+
+    def _get_windows_sway_list(self) -> List[str]:
+        """Lists window titles on Sway from the swaymsg tree."""
+        if not shutil.which("swaymsg"):
+            return []
+        out = self._run_cmd(["swaymsg", "-t", "get_tree"])
+        if not out:
+            return []
+        try:
+            tree = json.loads(out)
+        except Exception:
+            return []
+
+        titles = []
+        def walk(node):
+            if node.get("name") and (node.get("app_id") or node.get("window_properties")):
+                titles.append(node["name"])
+            for child in node.get("nodes", []) + node.get("floating_nodes", []):
+                walk(child)
+        walk(tree)
+        return sorted(set(t for t in titles if not t.lower().startswith("keyforge")))
+
+    def _get_windows_hyprland_list(self) -> List[str]:
+        """Lists window titles on Hyprland via hyprctl clients."""
+        if not shutil.which("hyprctl"):
+            return []
+        out = self._run_cmd(["hyprctl", "clients", "-j"])
+        if not out:
+            return []
+        try:
+            clients = json.loads(out)
+        except Exception:
+            return []
+        return sorted(set(
+            c.get("title") for c in clients
+            if c.get("title") and not c["title"].lower().startswith("keyforge")
+        ))
 
     def use_event_monitoring(self, callback: Callable[[bool], None]) -> bool:
         try:

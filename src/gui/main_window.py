@@ -66,9 +66,10 @@ class KeyForgeApp:
         """Loads only the visually essential settings"""
         config = self.config_manager.config
         # Set quick visual values
-        self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
-        if config.get("target_app_name"):
-            self.app_focus_component.set_app_name(config.get("target_app_name"))
+        if self._app_focus_supported:
+            self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
+            if config.get("target_app_name"):
+                self.app_focus_component.set_app_name(config.get("target_app_name"))
 
     def _load_heavy_logic(self):
         """The rest of the configuration that requires processing"""
@@ -177,13 +178,15 @@ class KeyForgeApp:
         
         ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
         
-        self.app_focus_component = AppFocusComponent(
-            self.tab_dashboard, tr, 
-            self._refresh_windows_list, self._toggle_app_focus, self._on_app_selected
-        )
-        tr.subscribe(self.app_focus_component)
-        
-        ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
+        self._app_focus_supported = self.app_monitor.supports_window_detection()
+        if self._app_focus_supported:
+            self.app_focus_component = AppFocusComponent(
+                self.tab_dashboard, tr, 
+                self._refresh_windows_list, self._toggle_app_focus, self._on_app_selected
+            )
+            tr.subscribe(self.app_focus_component)
+            
+            ttk.Separator(self.tab_dashboard).pack(fill="x", pady=15)
 
         self.control_buttons = ControlButtonsComponent(
             self.tab_dashboard, 
@@ -263,12 +266,13 @@ class KeyForgeApp:
     def _load_configuration(self):
         """Loads the full configuration into the components."""
         config = self.config_manager.config
-        self.app_monitor.set_enforce_focus(config.get("enforce_app_focus", True))
-        self.app_monitor.set_target_app(config.get("target_app_name", ""))
+        self.app_monitor.set_enforce_focus(config.get("enforce_app_focus", True) if self._app_focus_supported else False)
+        self.app_monitor.set_target_app(config.get("target_app_name", "") if self._app_focus_supported else "")
         
-        self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
-        if config.get("target_app_name"):
-            self.app_focus_component.set_app_name(config.get("target_app_name"))
+        if self._app_focus_supported:
+            self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
+            if config.get("target_app_name"):
+                self.app_focus_component.set_app_name(config.get("target_app_name"))
             
         rules_data = config.get("rules", [])
         if rules_data:
@@ -281,8 +285,11 @@ class KeyForgeApp:
     def _save_config(self):
         """Saves the current configuration"""
         # 1. Get data from the CURRENT components
-        app_name = self.app_focus_component.get_app_name()
-        enforce_focus = self.app_focus_component.is_focus_enabled()
+        if self._app_focus_supported:
+            app_name = self.app_focus_component.get_app_name()
+            enforce_focus = self.app_focus_component.is_focus_enabled()
+        else:
+            app_name, enforce_focus = "", False
         
         # 2. Get the rules directly from the handler (Core)
         # We no longer use key_config_component or mode_component
@@ -344,8 +351,10 @@ class KeyForgeApp:
         
         # Preserve existing configuration
         config_update["rules"] = [rule.to_dict() for rule in self.key_handler.get_rules()]
-        config_update["enforce_app_focus"] = self.app_focus_component.is_focus_enabled()
-        config_update["target_app_name"] = self.app_focus_component.get_app_name()
+        config_update["enforce_app_focus"] = (
+            self.app_focus_component.is_focus_enabled() if self._app_focus_supported else False)
+        config_update["target_app_name"] = (
+            self.app_focus_component.get_app_name() if self._app_focus_supported else "")
         
         # Update the value that changed
         if setting_type == "lang":
@@ -434,13 +443,19 @@ class KeyForgeApp:
     # --- Window Utilities ---
     def _refresh_windows_list(self):
         """Refreshes the window list in the app focus component."""
-        self.app_focus_component.update_app_list(self.app_monitor.get_all_windows())
+        if self._app_focus_supported:
+            self.app_focus_component.update_app_list(self.app_monitor.get_all_windows())
 
     def _toggle_app_focus(self):
         """Enables or disables app focus enforcement in the UI."""
+        if not self._app_focus_supported:
+            return
         enforce = self.app_focus_component.is_focus_enabled()
         self.app_monitor.set_enforce_focus(enforce)
         if enforce:
+            # Populate the window list when focus is enabled so the dropdown
+            # is never empty; the list may not have been scanned yet.
+            self._refresh_windows_list()
             self.app_focus_component.app_combo.config(state="readonly")
             self.app_focus_component.btn_refresh.config(state="normal")
         else:
@@ -450,7 +465,7 @@ class KeyForgeApp:
 
     def _on_app_selected(self):
         """Updates the target app when a new app is selected."""
-        if self.app_focus_component.is_focus_enabled():
+        if self._app_focus_supported and self.app_focus_component.is_focus_enabled():
             self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
             self.app_monitor.update_status()
 
@@ -506,7 +521,8 @@ class KeyForgeApp:
             self.status_component.update_script_status(False)
             self.control_buttons.set_toggle_state(False)
             self.rules_manager.set_controls_state(True)
-            self.app_focus_component.set_controls_state(True)
+            if self._app_focus_supported:
+                self.app_focus_component.set_controls_state(True)
             if self.is_minimized and self.minimized_window:
                 self.minimized_window.update_visuals(False)
         else:
@@ -516,15 +532,18 @@ class KeyForgeApp:
                 messagebox.showwarning("KeyForge", self.tr_manager.tr("no_rules_msg"))
                 return
             
-            self.app_monitor.set_enforce_focus(self.app_focus_component.is_focus_enabled())
-            self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
+            self.app_monitor.set_enforce_focus(
+                self.app_focus_component.is_focus_enabled() if self._app_focus_supported else False)
+            self.app_monitor.set_target_app(
+                self.app_focus_component.get_app_name() if self._app_focus_supported else "")
             
             success, error = self.key_handler.start()
             if success:
                 self.status_component.update_script_status(True, len(self.key_handler.get_rules()))
                 self.control_buttons.set_toggle_state(True)
                 self.rules_manager.set_controls_state(False)
-                self.app_focus_component.set_controls_state(False)
+                if self._app_focus_supported:
+                    self.app_focus_component.set_controls_state(False)
                 if self.is_minimized and self.minimized_window:
                     self.minimized_window.update_visuals(True)
             else:
