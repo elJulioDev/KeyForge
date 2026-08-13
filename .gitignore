@@ -17,6 +17,7 @@ dist/
 data/config.json
 *.log
 logs/
+AGENTS.md
 
 # Editor / SO
 .vscode/
