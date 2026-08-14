@@ -204,6 +204,9 @@ requires-dist = [
     { name = "ttkbootstrap", specifier = ">=1.19.0" },
 ]
 
+[package.metadata.requires-dev]
+dev = []
+
 [[package]]
 name = "packaging"
 version = "26.3"
