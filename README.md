@@ -47,7 +47,7 @@ The project uses a stack focused on operating system integration and user experi
     * `pygetwindow`: Active window detection on Windows/macOS (on Linux this library is not supported; `wmctrl`/`xdotool` are used instead, see below).
     * `Pillow`: Renders the app's icon set (real icons, no emoji) from `assets/icons/`.
     * `ctypes` (WinAPI): For deep integration with Windows events.
-    * `pywin32`: Windows-only (installed conditionally via environment marker in `requirements.txt`).
+    * `pywin32`: Windows-only (installed conditionally via environment marker in `pyproject.toml`).
     * `requests` & `packaging`: For the auto-update mechanism.
 * **Packaging:** Structure prepared for compilation with `PyInstaller` (relative path support with `sys._MEIPASS`).
 
@@ -66,24 +66,15 @@ git clone https://github.com/elJulioDev/KeyForge.git
 cd keyforge
 ```
 
-2. **Create and activate a virtual environment:**
+2. **Install dependencies and create virtual environment:**
 ```bash
-python -m venv venv
-# En Windows:
-venv\Scripts\activate
-# En macOS/Linux:
-source venv/bin/activate
+uv sync
 ```
 
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Run the application:**
+3. **Run the application:**
 **Windows note:** run the terminal as Administrator for the keyboard hooks to work correctly.
 ```bash
- python KeyForge.py
+uv run python main.py
 ```
 
 ## Linux permissions
@@ -169,8 +160,9 @@ keyforge/
 │       ├── logger.py                   # Rotating log system
 │       └── window_manager.py           # Window centering, dragging, dialog stacking
 ├── .gitignore                          # [New]
-├── KeyForge.py                         # Entry Point
-├── requirements.txt                    # Project dependencies
+├── main.py                             # Entry Point
+├── pyproject.toml                      # Project metadata & dependencies
+├── uv.lock                             # Locked dependencies
 └── README.md                           # Documentation
 ```
 
