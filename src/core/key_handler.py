@@ -7,6 +7,11 @@ import keyboard
 import time
 import sys
 import os
+import threading
+import warnings
+import subprocess
+import shutil
+from collections import deque
 from typing import Dict, List, Optional, Tuple
 
 # Professional logger (imported from the utils module)
@@ -66,6 +71,10 @@ def _patch_keyboard_dumpkeys_cache():
     Solution: cache the 'dumpkeys' output once (generated with sudo, or from a
     real TTY with Ctrl+Alt+F3) and serve it from disk on every normal start,
     without invoking the binary again.
+
+    The cache is keyed by the current keyboard layout (best effort): if the
+    layout changes, the cached scan-code tables would be stale, so a new
+    layout regenerates them (when possible) instead of serving the old ones.
     """
     if not sys.platform.startswith('linux'):
         return
@@ -74,15 +83,39 @@ def _patch_keyboard_dumpkeys_cache():
         import keyboard._nixkeyboard as _nixkeyboard
 
         cache_dir = CONFIG_DIR / "dumpkeys_cache"
-        cache_files = {
-            ('dumpkeys', '--keys-only'): cache_dir / "keys_only.txt",
-            ('dumpkeys', '--long-info'): cache_dir / "long_info.txt",
-        }
-        original_check_output = _nixkeyboard.check_output
+
+        def _current_layout_key():
+            """Best-effort identifier for the active keyboard layout.
+            Returns None when it cannot be determined."""
+            for cmd, args in (("localectl", ["status"]), ("setxkbmap", ["-query"])):
+                binary = shutil.which(cmd)
+                if not binary:
+                    continue
+                try:
+                    out = subprocess.run(
+                        [binary] + args, capture_output=True, text=True, timeout=1)
+                    for line in out.stdout.splitlines():
+                        line = line.strip().lower()
+                        if line.startswith("layout:"):
+                            layout = line.split(":", 1)[1].strip()
+                            if layout:
+                                return layout.replace(" ", "_")
+                except Exception:
+                    continue
+            return None
 
         def _cached_check_output(cmd, *args, **kwargs):
+            cache_files = {
+                ('dumpkeys', '--keys-only'): cache_dir / "keys_only.txt",
+                ('dumpkeys', '--long-info'): cache_dir / "long_info.txt",
+            }
             path = cache_files.get(tuple(cmd))
             if path is not None:
+                layout_key = _current_layout_key()
+                # Per-layout cache file: a changed layout must not reuse the
+                # old key table.
+                if layout_key is not None:
+                    path = path.with_name(f"{path.stem}_{layout_key}.txt")
                 if path.exists():
                     return path.read_text(encoding='utf-8')
                 # First try: run the real binary (root or real TTY)
@@ -93,6 +126,7 @@ def _patch_keyboard_dumpkeys_cache():
                 return output
             return original_check_output(cmd, *args, **kwargs)
 
+        original_check_output = _nixkeyboard.check_output
         _nixkeyboard.check_output = _cached_check_output
     except Exception as e:
         logger.warning(f"Could not enable the 'dumpkeys' cache: {e}")
@@ -130,6 +164,10 @@ def _patch_keyboard_linux_real_suppress():
 
         EVIOCGRAB = 0x40044590
 
+        # Track already-registered atexit closers so hot-plugging many
+        # devices does not accumulate one handler per device.
+        _registered_closers = set()
+
         def _safe_grabbed_input_file(self):
             if self._input_file is None:
                 try:
@@ -153,7 +191,9 @@ def _patch_keyboard_linux_real_suppress():
                         self._input_file.close()
                     except Exception:
                         pass
-                _atexit.register(try_close)
+                if self.path not in _registered_closers:
+                    _registered_closers.add(self.path)
+                    _atexit.register(try_close)
             return self._input_file
 
         _nixcommon.EventDevice.input_file = property(_safe_grabbed_input_file)
@@ -161,12 +201,23 @@ def _patch_keyboard_linux_real_suppress():
         import struct as _struct
         import threading as _threading
 
+        # Sentinel event: when the app shuts down, set it so any reader
+        # thread stuck on a denied device can wake up and exit instead of
+        # leaking a thread blocked forever.
+        _denied_device_stop = _threading.Event()
+
+        import atexit as _atexit
+        _atexit.register(_denied_device_stop.set)
+
         def _safe_read_event(self):
             f = self.input_file
             if f is None:
-                # Device without access: this thread cannot read anything,
-                # it stays idle instead of blowing up with AttributeError.
-                _threading.Event().wait()
+                # Device without access: this thread cannot read anything.
+                # Block in short slices (checking the stop sentinel) instead
+                # of forever, so shutdown does not leak the thread.
+                while not _denied_device_stop.wait(0.5):
+                    pass
+                raise OSError("Device closed during shutdown")
             data = f.read(_struct.calcsize(_nixcommon.event_bin_format))
             seconds, microseconds, type_, code, value = _struct.unpack(_nixcommon.event_bin_format, data)
             return seconds + microseconds / 1e6, type_, code, value, self.path
@@ -249,8 +300,8 @@ class KeyRule:
     def from_dict(data: dict) -> 'KeyRule':
         """Create a rule from a dictionary"""
         return KeyRule(
-            data.get("key_to_replace", ""),
-            data.get("replacement_key", ""),
+            (data.get("key_to_replace") or "").strip().lower(),
+            (data.get("replacement_key") or "").strip().lower(),
             data.get("mode", "hold"),
             data.get("enabled", True)
         )
@@ -270,15 +321,23 @@ class KeyHandler:
         self._rules_map: Dict[str, KeyRule] = {}  # For fast O(1) lookup
         self._rules_list: List[KeyRule] = []      # For UI/persistence/order
         
+        # The hook callback (hook thread) reads _rules_map while the UI
+        # thread mutates it. A lock serializes the mutations; the hot-path
+        # lookup in handle_key_event takes a read lock so it never sees a
+        # half-written map.
+        self._rules_lock = threading.Lock()
+        
         self._tk_root = None
         self._active_keys = set()  # Prevent recursion
         
         # Performance metrics (optional)
-        self._latency_samples = []
+        self._latency_samples = deque(maxlen=1000)
+        self._latency_count = 0
         self._last_perf_log = time.time()
         
         # Active key-capture thread (listen_for_key)
         self._capture_thread = None
+        self._capture_stop = threading.Event()
         
     def set_tk_root(self, root):
         """Sets the reference to the Tkinter root for thread-safe operations"""
@@ -292,34 +351,48 @@ class KeyHandler:
         Returns:
             (success: bool, error_key: Optional[str])
         """
-        # Check for circular recursion BEFORE adding
-        if self._would_create_cycle(key_to_replace, replacement_key):
-            logger.warning(f"Circular cycle detected: {key_to_replace} -> {replacement_key}")
-            return False, "error_circular"
+        key_to_replace = key_to_replace.strip().lower()
+        replacement_key = replacement_key.strip().lower()
         
-        rule = KeyRule(key_to_replace, replacement_key, mode, enabled)
+        if not key_to_replace or not replacement_key:
+            return False, "error_empty_keys"
         
-        # Add to list (creation order)
-        self._rules_list.append(rule)
-        
-        # Add to map only if enabled
-        if enabled:
-            self._rules_map[key_to_replace] = rule
+        with self._rules_lock:
+            # One active rule per source key: a duplicate would silently
+            # orphan the earlier rule (it stays in the list but never fires).
+            if enabled and key_to_replace in self._rules_map:
+                logger.warning(f"Duplicate source key: {key_to_replace}")
+                return False, "error_duplicate_key"
+            
+            # Check for circular recursion BEFORE adding
+            if self._would_create_cycle(key_to_replace, replacement_key):
+                logger.warning(f"Circular cycle detected: {key_to_replace} -> {replacement_key}")
+                return False, "error_circular"
+            
+            rule = KeyRule(key_to_replace, replacement_key, mode, enabled)
+            
+            # Add to list (creation order)
+            self._rules_list.append(rule)
+            
+            # Add to map only if enabled
+            if enabled:
+                self._rules_map[key_to_replace] = rule
         
         logger.info(f"Rule added: {key_to_replace} -> {replacement_key} [{mode}]")
         return True, None
     
     def remove_rule(self, index: int) -> bool:
         """Remove a rule by index"""
-        if not 0 <= index < len(self._rules_list):
-            logger.error(f"Invalid rule index: {index}")
-            return False
-        
-        rule = self._rules_list.pop(index)
-        
-        # Remove from map if it was there
-        if rule.key_to_replace in self._rules_map:
-            del self._rules_map[rule.key_to_replace]
+        with self._rules_lock:
+            if not 0 <= index < len(self._rules_list):
+                logger.error(f"Invalid rule index: {index}")
+                return False
+            
+            rule = self._rules_list.pop(index)
+            
+            # Remove from map if it was there
+            if rule.key_to_replace in self._rules_map:
+                del self._rules_map[rule.key_to_replace]
         
         logger.info(f"Rule removed: {rule.key_to_replace} -> {rule.replacement_key}")
         return True
@@ -327,33 +400,45 @@ class KeyHandler:
     def update_rule(self, index: int, key_to_replace: str, replacement_key: str, 
                     mode: str, enabled: bool) -> Tuple[bool, Optional[str]]:
         """Update an existing rule"""
-        if not 0 <= index < len(self._rules_list):
-            return False, "error_invalid_index"
+        key_to_replace = key_to_replace.strip().lower()
+        replacement_key = replacement_key.strip().lower()
         
-        old_rule = self._rules_list[index]
+        if not key_to_replace or not replacement_key:
+            return False, "error_empty_keys"
         
-        # Check recursion only if the key changed. The old rule is removed
-        # from the map first so it is not part of its own cycle graph.
-        changed = (old_rule.key_to_replace != key_to_replace or 
-                   old_rule.replacement_key != replacement_key)
-        if changed:
-            old_removed = self._rules_map.pop(old_rule.key_to_replace, None)
-            if self._would_create_cycle(key_to_replace, replacement_key):
-                if old_removed is not None:
-                    self._rules_map[old_rule.key_to_replace] = old_removed
-                return False, "error_circular"
-        
-        # Remove the old rule from the map
-        if old_rule.key_to_replace in self._rules_map:
-            del self._rules_map[old_rule.key_to_replace]
-        
-        # Update rule
-        new_rule = KeyRule(key_to_replace, replacement_key, mode, enabled)
-        self._rules_list[index] = new_rule
-        
-        # Add to map if enabled
-        if enabled:
-            self._rules_map[key_to_replace] = new_rule
+        with self._rules_lock:
+            if not 0 <= index < len(self._rules_list):
+                return False, "error_invalid_index"
+            
+            old_rule = self._rules_list[index]
+            
+            # A duplicate source key (owned by another rule) must be rejected
+            # before we even try: otherwise we'd orphan the other rule.
+            if enabled and key_to_replace != old_rule.key_to_replace and key_to_replace in self._rules_map:
+                return False, "error_duplicate_key"
+            
+            # Check recursion only if the key changed. The old rule is removed
+            # from the map first so it is not part of its own cycle graph.
+            changed = (old_rule.key_to_replace != key_to_replace or 
+                       old_rule.replacement_key != replacement_key)
+            if changed:
+                old_removed = self._rules_map.pop(old_rule.key_to_replace, None)
+                if self._would_create_cycle(key_to_replace, replacement_key):
+                    if old_removed is not None:
+                        self._rules_map[old_rule.key_to_replace] = old_removed
+                    return False, "error_circular"
+            
+            # Remove the old rule from the map
+            if old_rule.key_to_replace in self._rules_map:
+                del self._rules_map[old_rule.key_to_replace]
+            
+            # Update rule
+            new_rule = KeyRule(key_to_replace, replacement_key, mode, enabled)
+            self._rules_list[index] = new_rule
+            
+            # Add to map if enabled
+            if enabled:
+                self._rules_map[key_to_replace] = new_rule
         
         logger.info(f"Rule updated [{index}]: {key_to_replace} -> {replacement_key}")
         return True, None
@@ -369,23 +454,31 @@ class KeyHandler:
         user can see them) but disabled and excluded from the active map,
         preventing A->B / B->A ping-pong from a hand-edited config.
         """
-        self._rules_list.clear()
-        self._rules_map.clear()
-        
-        for rule_dict in rules_data:
-            rule = KeyRule.from_dict(rule_dict)
-            self._rules_list.append(rule)
+        with self._rules_lock:
+            self._rules_list.clear()
+            self._rules_map.clear()
             
-            if rule.enabled and self._would_create_cycle(rule.key_to_replace, rule.replacement_key):
-                logger.warning(
-                    f"Skipping cyclic rule on load: {rule.key_to_replace} -> {rule.replacement_key}")
-                rule.enabled = False
-                continue
+            for rule_dict in rules_data:
+                rule = KeyRule.from_dict(rule_dict)
+                
+                # Skip rules with empty keys: they can never match anything
+                # and would pollute the map with a '' key.
+                if not rule.key_to_replace or not rule.replacement_key:
+                    logger.warning(f"Skipping rule with empty key: {rule.to_dict()}")
+                    continue
+                
+                self._rules_list.append(rule)
+                
+                if rule.enabled and self._would_create_cycle(rule.key_to_replace, rule.replacement_key):
+                    logger.warning(
+                        f"Skipping cyclic rule on load: {rule.key_to_replace} -> {rule.replacement_key}")
+                    rule.enabled = False
+                    continue
+                
+                if rule.enabled:
+                    self._rules_map[rule.key_to_replace] = rule
             
-            if rule.enabled:
-                self._rules_map[rule.key_to_replace] = rule
-        
-        logger.info(f"Loaded {len(self._rules_list)} rules ({len(self._rules_map)} active)")
+            logger.info(f"Loaded {len(self._rules_list)} rules ({len(self._rules_map)} active)")
     
     def _would_create_cycle(self, key_to_replace: str, replacement_key: str) -> bool:
         """
@@ -441,8 +534,11 @@ class KeyHandler:
             if e.name in self._active_keys:
                 return True
             
-            # O(1) LOOKUP - The magic is here
-            rule = self._rules_map.get(e.name)
+            # O(1) LOOKUP - The magic is here. The lock is released right
+            # after the lookup so concurrent rule edits never leave the hook
+            # seeing a half-written map.
+            with self._rules_lock:
+                rule = self._rules_map.get(e.name)
             
             if not rule:
                 return True  # No rule, let the key through
@@ -479,11 +575,13 @@ class KeyHandler:
             if start and __debug__:
                 latency_ms = (time.perf_counter() - start) * 1000
                 self._latency_samples.append(latency_ms)
+                self._latency_count += 1
                 
-                if len(self._latency_samples) >= 1000:
+                if self._latency_count >= 1000:
                     avg = sum(self._latency_samples) / len(self._latency_samples)
                     logger.debug(f"Average latency: {avg:.3f}ms (1000 events)")
                     self._latency_samples.clear()
+                    self._latency_count = 0
 
     @staticmethod
     def _reset_replaying_flag():
@@ -545,11 +643,12 @@ class KeyHandler:
             keyboard.unhook(self.key_hook)
             self.key_hook = None
             
-            # Release all active toggle keys
-            for rule in self._rules_list:
-                if rule.toggle_state_active:
-                    self._release_key(rule.replacement_key)
-                    rule.toggle_state_active = False
+            with self._rules_lock:
+                # Release all active toggle keys
+                for rule in self._rules_list:
+                    if rule.toggle_state_active:
+                        self._release_key(rule.replacement_key)
+                        rule.toggle_state_active = False
             
             self._active_keys.clear()
             logger.info("Hooks stopped successfully")
@@ -571,11 +670,15 @@ class KeyHandler:
         # of stacking threads that all answer to the same key press.
         if self._capture_thread and self._capture_thread.is_alive():
             return
+        
+        self._capture_stop.clear()
 
         def capture():
             try:
                 key = keyboard.read_event(suppress=False)
                 while key.event_type != 'down':
+                    if self._capture_stop.is_set():
+                        return
                     key = keyboard.read_event(suppress=False)
                 
                 captured_key = key.name
@@ -592,10 +695,15 @@ class KeyHandler:
                     self._tk_root.after(0, lambda: callback(None, str(e)))
                 else:
                     callback(None, str(e))
+            finally:
+                self._capture_thread = None
 
-        import threading
         self._capture_thread = threading.Thread(target=capture, daemon=True)
         self._capture_thread.start()
+
+    def cancel_key_capture(self):
+        """Cancels an in-flight key capture (e.g. dialog closed)."""
+        self._capture_stop.set()
 
     # COMPATIBILITY METHODS (To avoid breaking existing code)
 
@@ -604,15 +712,25 @@ class KeyHandler:
         DEPRECATED: Use add_rule() for multiple rules.
         Kept for backward compatibility.
         """
+        warnings.warn(
+            "set_keys() is deprecated. Use add_rule() instead.",
+            DeprecationWarning, stacklevel=2
+        )
         logger.warning("set_keys() is deprecated. Use add_rule() instead.")
-        self._rules_list.clear()
-        self._rules_map.clear()
+        with self._rules_lock:
+            self._rules_list.clear()
+            self._rules_map.clear()
         self.add_rule(key_to_replace, replacement_key, mode="hold", enabled=True)
     
     def set_mode(self, mode: str):
         """
         DEPRECATED: Use update_rule() to configure individual rules.
         """
+        warnings.warn(
+            "set_mode() is deprecated. Use update_rule() instead.",
+            DeprecationWarning, stacklevel=2
+        )
         logger.warning("set_mode() is deprecated. Use update_rule() instead.")
-        for rule in self._rules_list:
-            rule.mode = mode
+        with self._rules_lock:
+            for rule in self._rules_list:
+                rule.mode = mode

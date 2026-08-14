@@ -199,12 +199,8 @@ class RulesManagerComponent:
     def set_controls_state(self, enabled):
         """Enables or disables the toolbar buttons."""
         state = "normal" if enabled else "disabled"
-        # Disable all buttons inside the toolbar
-        for child in self.frame.winfo_children():
-             if isinstance(child, ttk.Frame): # The toolbar
-                 for btn in child.winfo_children():
-                     if isinstance(btn, ttk.Button):
-                         btn.config(state=state)
+        for btn in (self.btn_delete, self.btn_edit, self.btn_add):
+            btn.config(state=state)
 
     def update_translations(self):
         """Updates headings, buttons and reloads rules"""
@@ -247,6 +243,10 @@ class RuleDialog:
         self.dialog.resizable(False, False)
         self.dialog.transient(parent)
         
+        # Closing via the window X button must release the modal grab and
+        # cancel any in-flight key detection, leaving no stuck state.
+        self.dialog.protocol("WM_DELETE_WINDOW", self._on_close)
+        
         self._create_ui()
         
         if rule_data:
@@ -255,6 +255,19 @@ class RuleDialog:
         self.window_manager.center_and_resize(self.dialog)
         self.window_manager.elevate(self.dialog, parent)
         self.window_manager.safe_grab_set(self.dialog)
+
+    def _on_close(self):
+        """Closes the dialog, releasing the grab and cancelling detection."""
+        try:
+            self.dialog.grab_release()
+        except Exception:
+            pass
+        try:
+            if self.on_detect_key and hasattr(self, '_detect_lbl'):
+                self._detect_lbl = None  # drop ref; <Destroy> handles cleanup
+        except Exception:
+            pass
+        self.dialog.destroy()
     
     def _create_ui(self):
         """Creates the dialog UI."""
@@ -309,8 +322,11 @@ class RuleDialog:
         self._detect_lbl = lbl
 
         def cancel():
-            if lbl.winfo_exists():
-                lbl.destroy()
+            try:
+                if lbl.winfo_exists():
+                    lbl.destroy()
+            except Exception:
+                pass
 
         # Clicking the label cancels detection (avoids a stuck label)
         lbl.bind("<Button-1>", lambda e: cancel())
@@ -319,7 +335,11 @@ class RuleDialog:
 
         def on_key(k, err):
             if k:
-                var.set(k)
+                try:
+                    if self.dialog.winfo_exists():
+                        var.set(k)
+                except Exception:
+                    pass
             cancel()
 
         self.on_detect_key(on_key)
@@ -337,15 +357,39 @@ class RuleDialog:
 
     def _save(self):
         """Collects the data and calls the callback, then closes the dialog."""
-        if not self.source_var.get() or not self.target_var.get():
+        source = self.source_var.get().strip().lower()
+        target = self.target_var.get().strip().lower()
+        if not source or not target:
             # Tell the user why Save did nothing instead of silently ignoring
             messagebox.showwarning(self.tr("warning"), self.tr("fill_fields_error"))
             return
+        
+        # Validate the key names against the keyboard library when possible.
+        # If the library cannot validate (tables unavailable, e.g. Linux
+        # without a dumpkeys cache), accept the input.
+        for label, name in (("source", source), ("target", target)):
+            if not self._is_known_key(name):
+                messagebox.showwarning(
+                    self.tr("warning"),
+                    self.tr("invalid_key_msg", key=name, field=self.tr("replace_label" if label == "source" else "with_label"))
+                )
+                return
+        
         data = {
-            "key_to_replace": self.source_var.get().strip().lower(),
-            "replacement_key": self.target_var.get().strip().lower(),
+            "key_to_replace": source,
+            "replacement_key": target,
             "mode": self.mode_var.get(),
             "enabled": self.enabled_var.get()
         }
         if self.callback: self.callback(data)
         self.dialog.destroy()
+
+    @staticmethod
+    def _is_known_key(name: str) -> bool:
+        """True when the keyboard library recognizes 'name' as a real key.
+        Returns True (accept) if the library cannot validate at all."""
+        try:
+            import keyboard
+            return bool(keyboard.key_to_scan_codes(name))
+        except Exception:
+            return True

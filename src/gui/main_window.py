@@ -49,7 +49,6 @@ class KeyForgeApp:
 
         self.is_minimized = False
         self.minimized_window = None
-        self.drag_data = {"x": 0, "y": 0}
         self.is_restarting = False
         
         # 2. Initial settings
@@ -237,7 +236,7 @@ class KeyForgeApp:
             rule_data['mode'], rule_data['enabled']
         )
         if success: self._refresh_rules_ui()
-        else: messagebox.showerror("Error", error)
+        else: messagebox.showerror("Error", self.tr_manager.tr(error))
 
     def _edit_rule_logic(self, index, rule_data):
         """Updates an existing rule in the core."""
@@ -248,7 +247,7 @@ class KeyForgeApp:
             rule_data['mode'], rule_data['enabled']
         )
         if success: self._refresh_rules_ui()
-        else: messagebox.showerror("Error", error)
+        else: messagebox.showerror("Error", self.tr_manager.tr(error))
 
     def _delete_rule_logic(self, index):
         """Deletes a rule and refreshes the rules UI."""
@@ -263,25 +262,6 @@ class KeyForgeApp:
         self.key_handler.listen_for_key(callback)
 
     # --- Core Logic & Config (Same as before) ---
-    def _load_configuration(self):
-        """Loads the full configuration into the components."""
-        config = self.config_manager.config
-        self.app_monitor.set_enforce_focus(config.get("enforce_app_focus", True) if self._app_focus_supported else False)
-        self.app_monitor.set_target_app(config.get("target_app_name", "") if self._app_focus_supported else "")
-        
-        if self._app_focus_supported:
-            self.app_focus_component.app_focus_var.set(config.get("enforce_app_focus", True))
-            if config.get("target_app_name"):
-                self.app_focus_component.set_app_name(config.get("target_app_name"))
-            
-        rules_data = config.get("rules", [])
-        if rules_data:
-            self.key_handler.load_rules(rules_data)
-        
-        self._refresh_rules_ui()
-        self._refresh_windows_list()
-        self._toggle_app_focus()
-
     def _save_config(self):
         """Saves the current configuration"""
         # 1. Get data from the CURRENT components
@@ -409,19 +389,14 @@ class KeyForgeApp:
         # 2. Destroy the current window
         try:
             self.root.destroy()
-        except:
+        except Exception:
             pass
 
         # 3. ROBUST PROCESS RESTART
-        # CHANGE: Use logger.info instead of print
+        # sys.argv already contains the entry point (script path, or the .exe
+        # path in a PyInstaller bundle), so the same command works for both.
         self.logger.info("Executing process restart...")
-        
-        if getattr(sys, 'frozen', False):
-             # If it is an executable (PyInstaller)
-            os.execl(sys.executable, sys.executable, *sys.argv)
-        else:
-            # If it is a Python script (.py)
-            os.execl(sys.executable, sys.executable, *sys.argv)
+        os.execl(sys.executable, sys.executable, *sys.argv)
 
     def _stop_all_monitoring(self):
         """Stops all active monitoring systems"""
@@ -430,14 +405,14 @@ class KeyForgeApp:
             if hasattr(self, '_polling_id'):
                 self.root.after_cancel(self._polling_id)
                 self._polling_id = None
-        except:
+        except Exception:
             pass
     
         try:
             # Stop event monitoring
             if hasattr(self.app_monitor, 'stop_event_monitoring'):
                 self.app_monitor.stop_event_monitoring()
-        except:
+        except Exception:
             pass
 
     # --- Window Utilities ---
@@ -468,17 +443,6 @@ class KeyForgeApp:
         if self._app_focus_supported and self.app_focus_component.is_focus_enabled():
             self.app_monitor.set_target_app(self.app_focus_component.get_app_name())
             self.app_monitor.update_status()
-
-    def _start_drag(self, event):
-        """Records the starting point of a window drag."""
-        self.drag_data["x"] = event.x
-        self.drag_data["y"] = event.y
-
-    def _do_drag(self, event):
-        """Moves the window according to the drag event."""
-        x = self.root.winfo_x() + event.x - self.drag_data["x"]
-        y = self.root.winfo_y() + event.y - self.drag_data["y"]
-        self.root.geometry(f"+{x}+{y}")
 
     def _minimize_custom(self):
         """Minimizes the window to a floating icon preserving the visual position"""
@@ -611,13 +575,23 @@ class KeyForgeApp:
 
     def _on_close(self):
         """Stops the script and exits the application."""
-        if self.key_handler.is_active(): self.key_handler.stop()
-        self.root.destroy()
-        # Hard exit: with the exclusive keyboard grab (EVIOCGRAB) we do not
-        # risk any thread/descriptor leaving the process hanging in the
-        # background. The kernel releases the grab when the process dies.
-        import os
-        os._exit(0)
+        # Clean up the minimized widget first: its fade-in callbacks reference
+        # self.parent (the root we are about to destroy).
+        try:
+            if self.is_minimized and self.minimized_window:
+                self.minimized_window.hide()
+        except Exception:
+            pass
+        self._stop_all_monitoring()
+        if self.key_handler.is_active():
+            self.key_handler.stop()
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
+        # Exit normally so atexit handlers (keyboard file closers) and buffer
+        # flushes run. The kernel releases the EVIOCGRAB grab on process exit.
+        sys.exit(0)
 
     def run(self):
         """Runs the Tk main event loop."""
