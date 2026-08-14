@@ -23,10 +23,10 @@ class AutoUpdater:
             data = response.json()
             latest_tag = data.get("tag_name", "v0.0.0")
 
-            # Stripping the 'v' to compare bare numbers is not needed,
-            # packaging.version handles 'v1.4.0' correctly.
-            current_v = version.parse(CURRENT_VERSION)
-            latest_v = version.parse(latest_tag)
+            # packaging>=23 strictly enforces PEP 440, which rejects a 'v'
+            # prefix. Strip it before comparing (GitHub tags are 'v1.x.y').
+            current_v = version.parse(CURRENT_VERSION.lstrip("v"))
+            latest_v = version.parse(latest_tag.lstrip("v"))
 
             if latest_v > current_v:
                 return True, {

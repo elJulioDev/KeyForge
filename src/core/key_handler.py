@@ -206,7 +206,14 @@ def _patch_keyboard_linux_real_suppress():
 
                 # If the callback doesn't block the key, we re-inject it
                 # ourselves: the grab took it away from the system.
-                if callback(event) is not False:
+                # A raised exception here must NOT kill the reader thread:
+                # swallow it, log it, and keep the loop alive.
+                try:
+                    block = callback(event)
+                except Exception as exc:
+                    logger.error(f"Error handling key event: {exc}", exc_info=True)
+                    block = True
+                if block is not False:
                     device.write_event(_nixcommon.EV_KEY, scan_code, value)
 
         _nixkeyboard.listen = _passthrough_listen
@@ -436,17 +443,17 @@ class KeyHandler:
                 # Logic according to the rule's mode
                 if rule.mode == 'hold':
                     if e.event_type == keyboard.KEY_DOWN:
-                        keyboard.press(rule.replacement_key)
+                        self._press_key(rule.replacement_key)
                     elif e.event_type == keyboard.KEY_UP:
-                        keyboard.release(rule.replacement_key)
+                        self._release_key(rule.replacement_key)
                 
                 elif rule.mode == 'toggle':
                     if e.event_type == keyboard.KEY_DOWN:
                         if rule.toggle_state_active:
-                            keyboard.release(rule.replacement_key)
+                            self._release_key(rule.replacement_key)
                             rule.toggle_state_active = False
                         else:
-                            keyboard.press(rule.replacement_key)
+                            self._press_key(rule.replacement_key)
                             rule.toggle_state_active = True
                 
                 # Block the original key
@@ -466,6 +473,37 @@ class KeyHandler:
                     avg = sum(self._latency_samples) / len(self._latency_samples)
                     logger.debug(f"Average latency: {avg:.3f}ms (1000 events)")
                     self._latency_samples.clear()
+
+    @staticmethod
+    def _reset_replaying_flag():
+        """
+        keyboard.send() sets _listener.is_replaying = True and resets it to
+        False with no try/finally. If the key name is invalid, parse_hotkey
+        raises and the flag stays True forever, silently disabling remapping.
+        This forces it back to False after an error.
+        """
+        try:
+            listener = getattr(keyboard, '_listener', None)
+            if listener is not None:
+                listener.is_replaying = False
+        except Exception:
+            pass
+
+    def _press_key(self, key: str):
+        """Safe wrapper around keyboard.press that never breaks the hook."""
+        try:
+            keyboard.press(key)
+        except Exception as e:
+            logger.error(f"Failed to press key '{key}': {e}", exc_info=True)
+            self._reset_replaying_flag()
+
+    def _release_key(self, key: str):
+        """Safe wrapper around keyboard.release that never breaks the hook."""
+        try:
+            keyboard.release(key)
+        except Exception as e:
+            logger.error(f"Failed to release key '{key}': {e}", exc_info=True)
+            self._reset_replaying_flag()
 
     def start(self) -> Tuple[bool, Optional[str]]:
         """Start key capture"""
@@ -499,7 +537,7 @@ class KeyHandler:
             # Release all active toggle keys
             for rule in self._rules_list:
                 if rule.toggle_state_active:
-                    keyboard.release(rule.replacement_key)
+                    self._release_key(rule.replacement_key)
                     rule.toggle_state_active = False
             
             self._active_keys.clear()

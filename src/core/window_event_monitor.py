@@ -53,6 +53,7 @@ class WindowEventMonitor:
         self.hook_handle = None
         self.running = False
         self.thread = None
+        self._thread_id = None
         self._callback_ref = None  # Keep a reference to avoid GC
         
         if not WINDOWS_EVENTS_AVAILABLE:
@@ -78,6 +79,12 @@ class WindowEventMonitor:
             user32.UnhookWinEvent(self.hook_handle)
             self.hook_handle = None
         
+        # GetMessageW blocks until a message arrives; setting running=False is
+        # not enough to wake it. Post WM_QUIT (0x0012) to break the loop so
+        # the thread actually exits instead of leaking on every start/stop.
+        if self._thread_id:
+            user32.PostThreadMessageW(self._thread_id, 0x0012, 0, 0)
+        
         if self.thread:
             self.thread.join(timeout=1)
         
@@ -85,6 +92,7 @@ class WindowEventMonitor:
     
     def _event_loop(self):
         """Main event loop (runs in a separate thread)"""
+        self._thread_id = threading.get_ident()
         # Define the callback that will be called on each event
         def win_event_callback(hWinEventHook, event, hwnd, idObject, idChild, 
                               dwEventThread, dwmsEventTime):

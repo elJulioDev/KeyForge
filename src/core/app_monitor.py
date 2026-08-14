@@ -202,6 +202,8 @@ class AppMonitor:
     def _get_active_window(self) -> str:
         """Routes active-window detection to the backend for this session."""
         if self.session == 'windows':
+            if not self._win32_available:
+                return ""
             return self._get_active_window_win32()
         if self.session == 'x11':
             return self._get_active_window_fallback()
@@ -387,6 +389,8 @@ class AppMonitor:
     # -------------------------------------------------------------------------
     def get_all_windows(self) -> List[str]:
         if self.session == 'windows':
+            if not self._win32_available:
+                return []
             return self._get_windows_win32_list()
         if self.session == 'x11':
             return self._get_windows_fallback_list()

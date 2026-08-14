@@ -2,6 +2,7 @@
 Configuration and translations manager
 """
 import json
+import copy
 from pathlib import Path
 from .constants import CONFIG_FILE, LANG_FILE, DEFAULT_CONFIG
 from .translation_manager import TranslationManager
@@ -35,10 +36,10 @@ class ConfigManager:
                 return config
             else:
                 print("No configuration file found, using default values")
-                return DEFAULT_CONFIG.copy()
+                return copy.deepcopy(DEFAULT_CONFIG)
         except Exception as e:
             print(f"Error loading configuration: {e}")
-            return DEFAULT_CONFIG.copy()
+            return copy.deepcopy(DEFAULT_CONFIG)
     
     def save_config(self, config_data):
         """
