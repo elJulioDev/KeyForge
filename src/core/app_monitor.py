@@ -14,7 +14,7 @@ import subprocess
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Callable
 
 try:
     from ..utils.logger import get_logger
@@ -241,11 +241,19 @@ class AppMonitor:
             return ""
 
         script = 'var w = workspace.activeWindow;\nprint("KEYFORGE_ACTIVE:" + (w ? w.caption : "NONE"));\n'
-        script_path = Path(tempfile.gettempdir()) / "kwin_active_window.js"
+
+        # Unique temp file per invocation: rewritten every poll anyway, and
+        # cleaned up below so we don't leak a world-readable file in /tmp.
+        fd, script_path_str = tempfile.mkstemp(prefix="kwin_active_window_", suffix=".js")
+        script_path = Path(script_path_str)
         try:
-            if not script_path.exists() or script_path.read_text(encoding="utf-8") != script:
-                script_path.write_text(script, encoding="utf-8")
+            with os.fdopen(fd, 'w', encoding="utf-8") as f:
+                f.write(script)
         except Exception:
+            try:
+                script_path.unlink(missing_ok=True)
+            except Exception:
+                pass
             return ""
 
         try:
@@ -273,13 +281,20 @@ class AppMonitor:
             if line.startswith("KEYFORGE_ACTIVE:"):
                 title = line.split(":", 1)[1].strip()
 
-        # Unload the KWin script we just ran. Every 50ms poll would otherwise
+        # Unload the KWin script we just ran. Every poll would otherwise
         # stack script instances inside KWin until it runs out of memory.
         try:
             subprocess.run([cmd, "org.kde.KWin", "/Scripting",
                             "org.kde.kwin.Scripting.unloadScript",
                             str(script_path)],
                            capture_output=True, text=True, timeout=2.0)
+        except Exception:
+            pass
+
+        # Remove the temp script: no need to keep it, and it avoids leaking
+        # a world-readable file in /tmp.
+        try:
+            script_path.unlink(missing_ok=True)
         except Exception:
             pass
         return title

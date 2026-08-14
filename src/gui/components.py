@@ -2,7 +2,7 @@
 Individual components of the graphical interface
 """
 import ttkbootstrap as ttk
-from tkinter import StringVar, BooleanVar, messagebox
+from tkinter import BooleanVar
 from ..utils import WindowManager
 from ..utils.icons import get_icon
 
@@ -178,7 +178,7 @@ class AppFocusComponent:
         """Sets the name of the application"""
         try:
             self.app_combo.set(app_name)
-        except:
+        except Exception:
             pass
     
     def update_app_list(self, apps):

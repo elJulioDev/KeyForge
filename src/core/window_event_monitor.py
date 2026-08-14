@@ -120,7 +120,7 @@ class WindowEventMonitor:
             EVENT_SYSTEM_FOREGROUND,  # eventMax
             0,                         # hmodWinEventProc
             self._callback_ref,        # callback
-            0,                         # idProcess (0 = todos)
+            0,                         # idProcess (0 = all)
             0,                         # idThread (0 = todos)
             WINEVENT_OUTOFCONTEXT      # dwFlags
         )

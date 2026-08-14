@@ -12,7 +12,7 @@ class SplashScreen:
     Minimalist splash screen that respects the application theme.
     """
     
-    def __init__(self, parent_root, tr_manager=None, title="KeyForge", version="1.0"):
+    def __init__(self, parent_root, tr_manager=None, title="KeyForge", version=""):
         """Initialize and show the splash screen."""
         self.root = parent_root
         self.tr = tr_manager
@@ -103,13 +103,14 @@ class SplashScreen:
         )
         
         # --- VERSION ---
-        self.canvas.create_text(
-            w//2, 90,
-            text=self.version_text,
-            font=("Segoe UI", 8),
-            fill=secondary_color,
-            anchor="center"
-        )
+        if self.version_text:
+            self.canvas.create_text(
+                w//2, 90,
+                text=self.version_text,
+                font=("Segoe UI", 8),
+                fill=secondary_color,
+                anchor="center"
+            )
         
         # --- PROGRESS BAR ---
         bar_y = 105

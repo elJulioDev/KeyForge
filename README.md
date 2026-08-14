@@ -30,7 +30,7 @@ It is designed with a modular architecture that separates the key interception l
     * **Performance Monitoring:** Latency tracking to ensure the hook engine remains responsive under load.
 
 * **Modern and Functional Interface:**
-    * **Dark Mode Design:** Built with `ttkbootstrap` for a clean and professional aesthetic.
+    * **Multi-Theme Design:** Built with `ttkbootstrap` supporting Light (Cosmo, Flatly, Yeti) and Dark (Darkly, Cyborg, Vapor) themes, switchable from the Accessibility tab.
     * **Floating Widget (Mini-Mode):** Ability to minimize the app to a semi-transparent floating widget that visually indicates the script status (Active/Inactive) without being intrusive.
     * **CRUD Rule Manager:** Interactive table to add, edit, and delete multiple remapping rules simultaneously.
 
@@ -142,7 +142,8 @@ keyforge/
 ├── src/                                # Modular source code
 │   ├── config/                         # Configuration managers and constants
 │   │   ├── config_manager.py
-│   │   └── constants.py
+│   │   ├── constants.py
+│   │   └── translation_manager.py      # Language hot-reload (ES/EN)
 │   ├── core/                           # Business logic (Backend)
 │   │   ├── app_monitor.py              # Window detection (win32 / wmctrl+xdotool fallback)
 │   │   ├── key_handler.py              # Remapping logic (O(1) Map)

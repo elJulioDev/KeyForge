@@ -2,7 +2,10 @@
 Translation manager with hot-reload support
 """
 import json
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class TranslationManager:
@@ -38,7 +41,7 @@ class TranslationManager:
         """Loads lang.json with improved structure"""
         try:
             if not self.lang_file.exists():
-                print(f"Translations file not found: {self.lang_file}")
+                logger.warning(f"Translations file not found: {self.lang_file}")
                 return False
                 
             with open(self.lang_file, 'r', encoding='utf-8') as f:
@@ -53,11 +56,11 @@ class TranslationManager:
                 self._translations = data
                 self._meta = {}
             
-            print(f"Translations loaded: {list(self._translations.keys())}")
+            logger.info(f"Translations loaded: {list(self._translations.keys())}")
             return True
             
         except Exception as e:
-            print(f"Error loading translations: {e}")
+            logger.error(f"Error loading translations: {e}")
             self._translations = {"es": {}, "en": {}}
             return False
     
@@ -145,13 +148,13 @@ class TranslationManager:
             return False
             
         if lang_code not in self._translations:
-            print(f"Language not available: {lang_code}")
+            logger.warning(f"Language not available: {lang_code}")
             return False
         
         old_lang = self.current_lang
         self.current_lang = lang_code
         
-        print(f"Language changed: {old_lang} → {lang_code}")
+        logger.info(f"Language changed: {old_lang} → {lang_code}")
         self._notify_subscribers()
         return True
     
@@ -188,6 +191,6 @@ class TranslationManager:
                 try:
                     component.update_translations()
                 except Exception as e:
-                    print(f"Error updating component: {e}")
+                    logger.error(f"Error updating component: {e}")
         finally:
             self._is_updating = False

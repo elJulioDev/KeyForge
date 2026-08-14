@@ -40,8 +40,13 @@ LANG_FILE = BASE_DIR / "data" / "lang.json"
 # CONFIG_FILE is saved in the external folder (outside the exe)
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
-# Create configuration folder if it does not exist
-CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+# Create configuration folder if it does not exist.
+# Failures (permissions, read-only media) must not crash the app at import
+# time: config_manager handles save/load failures gracefully.
+try:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+except OSError as e:
+    print(f"WARNING: could not create config directory {CONFIG_DIR}: {e}")
 
 # --- Default Configuration ---
 DEFAULT_CONFIG = {

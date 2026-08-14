@@ -208,7 +208,7 @@ class MinimizedWindow:
 
     def _fade_in(self, alpha=0.0):
         """Fades the window in by gradually increasing the alpha."""
-        if self.window and alpha < 0.9:
+        if self.window and alpha < 1.0:
             self.window.attributes('-alpha', alpha)
             self._fade_after_id = self.parent.after(
                 15, lambda: self._fade_in(alpha + 0.05))

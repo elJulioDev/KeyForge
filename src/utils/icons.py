@@ -9,6 +9,13 @@ live reference to the PhotoImage or the garbage collector destroys it.
 from pathlib import Path
 from PIL import Image, ImageTk
 
+try:
+    from .logger import get_logger
+    _logger = get_logger()
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 _ICONS_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "icons"
 _cache = {}
 
@@ -21,6 +28,9 @@ def get_icon(name: str, size: int = 16, color: str = "#FFFFFF") -> ImageTk.Photo
     Cached by (name, size, color): calling it repeatedly with the same
     parameters does not re-decode the file nor create new references for
     the garbage collector.
+
+    If the icon file is missing (corrupted install) it returns a plain
+    colored square instead of crashing the whole UI.
     """
     key = (name, size, color)
     cached = _cache.get(key)
@@ -29,9 +39,19 @@ def get_icon(name: str, size: int = 16, color: str = "#FFFFFF") -> ImageTk.Photo
 
     path = _ICONS_DIR / f"{name}.png"
     if not path.exists():
-        raise FileNotFoundError(f"Icon not found: {path}")
+        _logger.warning(f"Icon not found: {path}; using fallback")
+        photo = _fallback_icon(size, color)
+        _cache[key] = photo
+        return photo
 
-    source = Image.open(path).convert("RGBA")
+    try:
+        source = Image.open(path).convert("RGBA")
+    except Exception as e:
+        _logger.warning(f"Could not open icon {path}: {e}; using fallback")
+        photo = _fallback_icon(size, color)
+        _cache[key] = photo
+        return photo
+
     if source.size != (size, size):
         source = source.resize((size, size), Image.LANCZOS)
 
@@ -51,6 +71,17 @@ def get_icon(name: str, size: int = 16, color: str = "#FFFFFF") -> ImageTk.Photo
     return photo
 
 
+def _fallback_icon(size: int, color: str) -> ImageTk.PhotoImage:
+    """Solid square placeholder used when an icon PNG is missing."""
+    r, g, b = _hex_to_rgb(color)
+    img = Image.new("RGBA", (size, size), (r, g, b, 255))
+    photo = ImageTk.PhotoImage(img)
+    img.close()
+    return photo
+
+
 def _hex_to_rgb(color: str):
-    color = color.lstrip("#")
+    color = (color or "#FFFFFF").lstrip("#")
+    if len(color) != 6:
+        color = "#FFFFFF".lstrip("#")
     return tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
