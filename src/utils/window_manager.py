@@ -39,6 +39,10 @@ class WindowManager:
     def center_and_resize(self, window, parent=None):
         """
         Calculate the size needed for the content and center the window.
+
+        Prefers the parent window as the anchor (where the user is working),
+        falling back to the primary screen center. The result is clamped so
+        the window stays on screen.
         """
         # Hide the window while calculating to avoid flicker
         window.withdraw()
@@ -52,9 +56,19 @@ class WindowManager:
         screen_w = window.winfo_screenwidth()
         screen_h = window.winfo_screenheight()
         
-        # Calculate centered position
-        x = int((screen_w / 2) - (req_w / 2))
-        y = int((screen_h / 2) - (req_h / 2))
+        # Anchor on the parent window when it is visible
+        if parent is not None and parent.winfo_ismapped():
+            cx = parent.winfo_rootx() + parent.winfo_width() / 2
+            cy = parent.winfo_rooty() + parent.winfo_height() / 2
+        else:
+            cx = screen_w / 2
+            cy = screen_h / 2
+        
+        # Calculate centered position and clamp to the visible screen
+        x = int(cx - (req_w / 2))
+        y = int(cy - (req_h / 2))
+        x = max(0, min(x, screen_w - req_w))
+        y = max(0, min(y, screen_h - req_h))
         
         # Apply geometry
         window.geometry(f"{req_w}x{req_h}+{x}+{y}")

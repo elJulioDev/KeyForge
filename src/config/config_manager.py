@@ -49,6 +49,9 @@ class ConfigManager:
             config_data (dict): Dictionary with the configuration to save
         """
         try:
+            if not isinstance(config_data, dict):
+                raise TypeError(f"config_data must be a dict, got {type(config_data).__name__}")
+
             # Read the current config
             if CONFIG_FILE.exists():
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:

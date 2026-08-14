@@ -1,6 +1,7 @@
 """
 Accessibility settings component (Language, Theme and Updates)
 """
+import threading
 import ttkbootstrap as ttk
 from tkinter import StringVar
 from tkinter.messagebox import askyesno, showinfo, showerror
@@ -37,6 +38,11 @@ class AccessibilityComponent:
         self.lang_var = StringVar(value=current_lang)
         display_theme_name = self._get_display_name_from_code(current_theme)
         self.theme_var = StringVar(value=display_theme_name)
+        
+        # Track the currently applied values so re-selecting the SAME
+        # value (theme/language) does not trigger a save/restart.
+        self._applied_lang = current_lang
+        self._applied_theme = current_theme
         
         self.updater = AutoUpdater() # Updater instance
         
@@ -114,14 +120,25 @@ class AccessibilityComponent:
             ).pack(anchor="w", pady=5)
     
     def _check_updates(self):
-        """Logic for the check updates button"""
+        """Logic for the check updates button (runs the HTTP request off the UI thread)"""
         original_text = self.check_btn.cget("text")
         self.check_btn.configure(text=self.tr("checking_updates"), state="disabled")
         self.frame.update() # Force UI refresh
 
-        has_update, data = self.updater.check_for_updates()
+        def worker():
+            has_update, data = self.updater.check_for_updates()
+            # Marshal back to the Tk main thread
+            self.frame.after(0, lambda: self._on_check_done(
+                original_text, has_update, data))
 
-        self.check_btn.configure(text=original_text, state="normal")
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_check_done(self, original_text, has_update, data):
+        """Re-enables the button and shows the result (main thread)."""
+        try:
+            self.check_btn.configure(text=original_text, state="normal")
+        except Exception:
+            return  # widget destroyed while the request was in flight
 
         if has_update:
             # Data is a dict with {version, url, body}
@@ -146,6 +163,10 @@ class AccessibilityComponent:
     def _on_language_change(self):
         """Callback when the language changes"""
         new_lang = self.lang_var.get()
+        # Re-selecting the already-applied language is a no-op
+        if new_lang == self._applied_lang:
+            return
+        self._applied_lang = new_lang
         if self.on_change:
             self.on_change("lang", new_lang)
     
@@ -153,6 +174,10 @@ class AccessibilityComponent:
         """Callback when the theme changes"""
         display_name = self.theme_var.get()
         theme_code = self._get_theme_code_from_display(display_name)
+        # Re-selecting the already-applied theme must not restart the app
+        if theme_code == self._applied_theme:
+            return
+        self._applied_theme = theme_code
         if self.on_change:
             self.on_change("theme", theme_code)
     

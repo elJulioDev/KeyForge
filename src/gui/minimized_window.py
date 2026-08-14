@@ -18,6 +18,8 @@ class MinimizedWindow:
         self.window_manager = WindowManager()
         self.canvas = None # Canvas reference to redraw
         self.size = 90     # Stored size
+        self._fade_after_id = None  # Pending fade-in callback
+        self._restoring = False     # Guards against double restore
     
     def show(self, is_active=False, center_pos=None):
         """Shows the minimized window with the corresponding visual state"""
@@ -179,33 +181,48 @@ class MinimizedWindow:
 
     def _restore(self):
         """Restores the main window passing the current position"""
-        if self.window:
-            # 1. Get the current center of the minimized window
-            mx = self.window.winfo_x()
-            my = self.window.winfo_y()
-            mw = self.window.winfo_width()
-            mh = self.window.winfo_height()
-            
-            center_x = mx + (mw / 2)
-            center_y = my + (mh / 2)
-            
-            # We hide the icon
-            self.hide()
-            
-            # 2. We call the callback passing the position (center_pos)
-            # Note: self.on_restore is _restore_window in the main app
-            self.on_restore(center_pos=(center_x, center_y))
-        else:
-            self.on_restore()
+        if self._restoring:
+            return
+        self._restoring = True
+        try:
+            if self.window:
+                # 1. Get the current center of the minimized window
+                mx = self.window.winfo_x()
+                my = self.window.winfo_y()
+                mw = self.window.winfo_width()
+                mh = self.window.winfo_height()
+                
+                center_x = mx + (mw / 2)
+                center_y = my + (mh / 2)
+                
+                # We hide the icon
+                self.hide()
+                
+                # 2. We call the callback passing the position (center_pos)
+                # Note: self.on_restore is _restore_window in the main app
+                self.on_restore(center_pos=(center_x, center_y))
+            else:
+                self.on_restore()
+        finally:
+            self._restoring = False
 
     def _fade_in(self, alpha=0.0):
         """Fades the window in by gradually increasing the alpha."""
         if self.window and alpha < 0.9:
             self.window.attributes('-alpha', alpha)
-            self.parent.after(15, lambda: self._fade_in(alpha + 0.05))
+            self._fade_after_id = self.parent.after(
+                15, lambda: self._fade_in(alpha + 0.05))
     
     def hide(self):
         """Destroys the minimized window."""
+        # Cancel any pending fade-in callback so it does not touch the
+        # destroyed window later.
+        if self._fade_after_id is not None:
+            try:
+                self.parent.after_cancel(self._fade_after_id)
+            except Exception:
+                pass
+            self._fade_after_id = None
         if self.window:
             self.window.destroy()
             self.window = None

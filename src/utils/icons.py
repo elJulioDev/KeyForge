@@ -42,6 +42,12 @@ def get_icon(name: str, size: int = 16, color: str = "#FFFFFF") -> ImageTk.Photo
 
     photo = ImageTk.PhotoImage(tinted)
     _cache[key] = photo
+
+    # ImageTk.PhotoImage embeds the pixels into Tk; the PIL images and their
+    # file descriptors can be released right away.
+    source.close()
+    alpha.close()
+    tinted.close()
     return photo
 
 

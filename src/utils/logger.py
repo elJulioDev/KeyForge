@@ -76,6 +76,9 @@ class KeyForgeLogger:
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
         
+        # Remove logs older than the retention window on every start
+        self.cleanup_old_logs()
+        
         # Startup log
         self.logger.info("=" * 70)
         self.logger.info("KeyForge - Logging system initialized")
@@ -116,7 +119,12 @@ class KeyForgeLogger:
                 levelname = record.levelname
                 if levelname in COLORS:
                     record.levelname = f"{COLORS[levelname]}{levelname}{COLORS['RESET']}"
-                return super().format(record)
+                try:
+                    return super().format(record)
+                finally:
+                    # Restore the clean levelname: the record is shared with
+                    # the file handler and must not keep ANSI codes.
+                    record.levelname = levelname
         
         return ColoredFormatter(
             '%(levelname)s | %(message)s',

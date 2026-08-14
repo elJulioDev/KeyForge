@@ -277,6 +277,9 @@ class KeyHandler:
         self._latency_samples = []
         self._last_perf_log = time.time()
         
+        # Active key-capture thread (listen_for_key)
+        self._capture_thread = None
+        
     def set_tk_root(self, root):
         """Sets the reference to the Tkinter root for thread-safe operations"""
         self._tk_root = root
@@ -329,10 +332,15 @@ class KeyHandler:
         
         old_rule = self._rules_list[index]
         
-        # Check recursion only if the key changed
-        if (old_rule.key_to_replace != key_to_replace or 
-            old_rule.replacement_key != replacement_key):
-            if self._would_create_cycle(key_to_replace, replacement_key, exclude_index=index):
+        # Check recursion only if the key changed. The old rule is removed
+        # from the map first so it is not part of its own cycle graph.
+        changed = (old_rule.key_to_replace != key_to_replace or 
+                   old_rule.replacement_key != replacement_key)
+        if changed:
+            old_removed = self._rules_map.pop(old_rule.key_to_replace, None)
+            if self._would_create_cycle(key_to_replace, replacement_key):
+                if old_removed is not None:
+                    self._rules_map[old_rule.key_to_replace] = old_removed
                 return False, "error_circular"
         
         # Remove the old rule from the map
@@ -355,7 +363,12 @@ class KeyHandler:
         return self._rules_list
     
     def load_rules(self, rules_data: List[dict]):
-        """Load rules from saved data"""
+        """
+        Load rules from saved data.
+        Rules that would close a remapping cycle are kept in the list (so the
+        user can see them) but disabled and excluded from the active map,
+        preventing A->B / B->A ping-pong from a hand-edited config.
+        """
         self._rules_list.clear()
         self._rules_map.clear()
         
@@ -363,32 +376,30 @@ class KeyHandler:
             rule = KeyRule.from_dict(rule_dict)
             self._rules_list.append(rule)
             
+            if rule.enabled and self._would_create_cycle(rule.key_to_replace, rule.replacement_key):
+                logger.warning(
+                    f"Skipping cyclic rule on load: {rule.key_to_replace} -> {rule.replacement_key}")
+                rule.enabled = False
+                continue
+            
             if rule.enabled:
                 self._rules_map[rule.key_to_replace] = rule
         
         logger.info(f"Loaded {len(self._rules_list)} rules ({len(self._rules_map)} active)")
     
-    def _would_create_cycle(self, key_to_replace: str, replacement_key: str, 
-                           exclude_index: Optional[int] = None) -> bool:
+    def _would_create_cycle(self, key_to_replace: str, replacement_key: str) -> bool:
         """
-        Detects circular remapping cycles using DFS.
+        Detects circular remapping cycles using DFS over the ACTIVE rules
+        (self._rules_map, only enabled rules) plus the proposed new edge.
         E.g.: A->B, B->C, C->A creates an infinite cycle.
-        Uses the internal map directly.
         """
-        # Build temporary dependency graph
+        # Build temporary dependency graph from the active rules
         graph = {}
-        
-        for i, rule in enumerate(self._rules_list):
-            if exclude_index is not None and i == exclude_index:
-                continue
-            if rule.key_to_replace not in graph:
-                graph[rule.key_to_replace] = []
-            graph[rule.key_to_replace].append(rule.replacement_key)
+        for key, rule in self._rules_map.items():
+            graph.setdefault(key, []).append(rule.replacement_key)
         
         # Add the new rule to the graph
-        if key_to_replace not in graph:
-            graph[key_to_replace] = []
-        graph[key_to_replace].append(replacement_key)
+        graph.setdefault(key_to_replace, []).append(replacement_key)
         
         # DFS to detect cycles
         def has_cycle(node: str, visited: set, rec_stack: set) -> bool:
@@ -556,6 +567,11 @@ class KeyHandler:
         Listens for and captures the next pressed key.
         Thread-safe with Tkinter.
         """
+        # If a capture is already in flight, ignore the new request instead
+        # of stacking threads that all answer to the same key press.
+        if self._capture_thread and self._capture_thread.is_alive():
+            return
+
         def capture():
             try:
                 key = keyboard.read_event(suppress=False)
@@ -578,8 +594,8 @@ class KeyHandler:
                     callback(None, str(e))
 
         import threading
-        thread = threading.Thread(target=capture, daemon=True)
-        thread.start()
+        self._capture_thread = threading.Thread(target=capture, daemon=True)
+        self._capture_thread.start()
 
     # COMPATIBILITY METHODS (To avoid breaking existing code)
 

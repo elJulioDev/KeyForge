@@ -301,10 +301,28 @@ class RuleDialog:
         ttk.Button(main_frame, text=self.tr("save_btn"), bootstyle="success", command=self._save).pack(side="right")
 
     def _detect_key(self, var):
-        """Captures a pressed key and stores it in the given variable."""
+        """Captures a pressed key and stores it in the given variable.
+        The label is clickable to cancel; it is also removed when the
+        key arrives or when the dialog is destroyed."""
         lbl = ttk.Label(self.dialog, text=self.tr("press_key_label"), bootstyle="inverse-danger")
         lbl.place(relx=0.5, rely=0.9, anchor="center")
-        self.on_detect_key(lambda k, e: (var.set(k) if k else None, lbl.destroy()))
+        self._detect_lbl = lbl
+
+        def cancel():
+            if lbl.winfo_exists():
+                lbl.destroy()
+
+        # Clicking the label cancels detection (avoids a stuck label)
+        lbl.bind("<Button-1>", lambda e: cancel())
+        # Also clean up if the dialog is closed while detecting
+        self.dialog.bind("<Destroy>", lambda e: cancel())
+
+        def on_key(k, err):
+            if k:
+                var.set(k)
+            cancel()
+
+        self.on_detect_key(on_key)
 
     def _show_common_keys(self):
         """Opens the common keys reference window."""
@@ -320,6 +338,8 @@ class RuleDialog:
     def _save(self):
         """Collects the data and calls the callback, then closes the dialog."""
         if not self.source_var.get() or not self.target_var.get():
+            # Tell the user why Save did nothing instead of silently ignoring
+            messagebox.showwarning(self.tr("warning"), self.tr("fill_fields_error"))
             return
         data = {
             "key_to_replace": self.source_var.get().strip().lower(),

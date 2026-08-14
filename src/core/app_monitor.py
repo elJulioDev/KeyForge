@@ -266,10 +266,23 @@ class AppMonitor:
         except Exception:
             return ""
 
+        # journalctl is chronological: take the LAST match, otherwise a rapid
+        # Alt-Tab returns the title of the window focused ~5s ago.
+        title = ""
         for line in result.stdout.splitlines():
             if line.startswith("KEYFORGE_ACTIVE:"):
-                return line.split(":", 1)[1].strip()
-        return ""
+                title = line.split(":", 1)[1].strip()
+
+        # Unload the KWin script we just ran. Every 50ms poll would otherwise
+        # stack script instances inside KWin until it runs out of memory.
+        try:
+            subprocess.run([cmd, "org.kde.KWin", "/Scripting",
+                            "org.kde.kwin.Scripting.unloadScript",
+                            str(script_path)],
+                           capture_output=True, text=True, timeout=2.0)
+        except Exception:
+            pass
+        return title
 
     def _get_active_window_gnome(self) -> str:
         """Gets the focused window title on GNOME (Wayland or X11)."""

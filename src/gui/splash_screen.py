@@ -152,7 +152,8 @@ class SplashScreen:
 
     def update_step(self, value, text):
         """Updates the display"""
-        if not self.canvas: return
+        if not self.canvas or not self.window:
+            return
         
         self.progress_value = max(0, min(100, value))
         
@@ -187,3 +188,4 @@ class SplashScreen:
         if self.window:
             self.window.destroy()
             self.window = None
+        self.canvas = None

@@ -382,8 +382,8 @@ class KeyForgeApp:
         # Update tab titles
         self._update_tab_labels()
         
-        # Restore the selected tab
-        if current_tab:
+        # Restore the selected tab (index 0 is valid: the Dashboard tab)
+        if current_tab is not None:
             self.notebook.select(current_tab)
         
         if changed:

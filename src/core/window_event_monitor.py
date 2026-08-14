@@ -6,6 +6,14 @@ Efficient alternative to polling
 import sys
 import threading
 
+# Professional logger (imported from the utils module)
+try:
+    from ..utils.logger import get_logger
+    logger = get_logger()
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
 # Import only on Windows
 if sys.platform == 'win32':
     try:
@@ -118,7 +126,7 @@ class WindowEventMonitor:
         )
         
         if not self.hook_handle:
-            print("Error: Could not register WinEventHook")
+            logger.error("Could not register WinEventHook")
             self.running = False
             return
         
